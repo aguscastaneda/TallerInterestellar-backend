@@ -38,6 +38,7 @@ model User {
   client     Client?
   boss       Boss?
   mechanic   Mechanic?
+  admin      Admin?
   notifications Notification[]
 
   @@map("User")
@@ -49,6 +50,7 @@ model Client {
   user      User     @relation(fields: [userId], references: [id])
   cars      Car[]
   payments  Payment[]
+  serviceRequests ServiceRequest[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -60,10 +62,21 @@ model Boss {
   userId    Int        @unique
   user      User       @relation(fields: [userId], references: [id])
   mechanics Mechanic[]
+  serviceRequests ServiceRequest[]
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 
   @@map("Boss")
+}
+
+model Admin {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @unique
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("Admin")
 }
 
 model Mechanic {
@@ -74,6 +87,8 @@ model Mechanic {
   boss      Boss?    @relation(fields: [bossId], references: [id])
   cars      Car[]
   repairs   Repair[]
+  preferredServiceRequests ServiceRequest[] @relation("PreferredMechanic")
+  assignedServiceRequests ServiceRequest[] @relation("AssignedMechanic")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -105,6 +120,7 @@ model Car {
   priority     Int        @default(1)
   estimatedDate DateTime?
   repairs      Repair[]
+  serviceRequests ServiceRequest[]
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
@@ -152,4 +168,24 @@ model Notification {
   updatedAt DateTime @updatedAt
 
   @@map("Notification")
+}
+
+model ServiceRequest {
+  id                   Int       @id @default(autoincrement())
+  carId                Int
+  car                  Car       @relation(fields: [carId], references: [id])
+  clientId             Int
+  client               Client    @relation(fields: [clientId], references: [id])
+  preferredMechanicId  Int?
+  preferredMechanic    Mechanic? @relation("PreferredMechanic", fields: [preferredMechanicId], references: [id])
+  assignedBossId       Int?
+  assignedBoss         Boss?     @relation(fields: [assignedBossId], references: [id])
+  assignedMechanicId   Int?
+  assignedMechanic     Mechanic? @relation("AssignedMechanic", fields: [assignedMechanicId], references: [id])
+  description          String    @db.Text
+  status               String    @db.VarChar(30) // PENDING, ASSIGNED, IN_PROGRESS, COMPLETED
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@map("ServiceRequest")
 }

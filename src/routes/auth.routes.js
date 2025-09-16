@@ -28,7 +28,7 @@ router.post('/register', [
   body('lastName').notEmpty().trim(),
   body('phone').optional().trim(),
   body('cuil').optional().trim(),
-  body('roleId').isInt({ min: 1, max: 3 }),
+  body('roleId').isInt({ min: 1, max: 4 }),
   handleValidationErrors
 ], async (req, res) => {
   try {
@@ -91,6 +91,10 @@ router.post('/register', [
       await prisma.boss.create({
         data: { userId: user.id }
       });
+    } else if (roleId === 4) { // Admin
+      await prisma.admin.create({
+        data: { userId: user.id }
+      });
     }
 
     // Generar token JWT
@@ -139,7 +143,8 @@ router.post('/login', [
         role: true,
         client: true,
         mechanic: true,
-        boss: true
+        boss: true,
+        admin: true
       }
     });
 
@@ -212,7 +217,8 @@ router.get('/me', async (req, res) => {
         role: true,
         client: true,
         mechanic: true,
-        boss: true
+        boss: true,
+        admin: true
       }
     });
 

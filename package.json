@@ -32,5 +32,8 @@
     "prisma"
   ],
   "author": "Taller Interestelar",
-  "license": "MIT"
+  "license": "MIT",
+  "prisma": {
+    "seed": "node prisma/seed.js"
+  }
 }

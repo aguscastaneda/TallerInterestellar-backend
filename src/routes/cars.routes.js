@@ -67,6 +67,49 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET /api/cars/plate/:licensePlate - Buscar por patente exacta
+router.get('/plate/:licensePlate', async (req, res) => {
+  try {
+    const { licensePlate } = req.params;
+    const car = await prisma.car.findUnique({
+      where: { licensePlate },
+      include: {
+        client: { include: { user: { select: { id: true, name: true, lastName: true, email: true, phone: true } } } },
+        mechanic: { include: { user: { select: { id: true, name: true, lastName: true } } } },
+        status: true
+      }
+    });
+
+    if (!car) {
+      return res.status(404).json({ success: false, message: 'Patente inexistente' });
+    }
+
+    res.json({ success: true, data: car });
+  } catch (error) {
+    console.error('Error al buscar por patente:', error);
+    res.status(500).json({ success: false, message: 'Error interno del servidor' });
+  }
+});
+
+// GET /api/cars/client/:clientId - Autos por cliente
+router.get('/client/:clientId', async (req, res) => {
+  try {
+    const { clientId } = req.params;
+    const cars = await prisma.car.findMany({
+      where: { clientId: parseInt(clientId) },
+      include: {
+        status: true,
+        mechanic: { include: { user: { select: { id: true, name: true, lastName: true } } } }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json({ success: true, data: cars });
+  } catch (error) {
+    console.error('Error al obtener autos del cliente:', error);
+    res.status(500).json({ success: false, message: 'Error interno del servidor' });
+  }
+});
+
 // GET /api/cars/:id - Obtener auto por ID
 router.get('/:id', async (req, res) => {
   try {

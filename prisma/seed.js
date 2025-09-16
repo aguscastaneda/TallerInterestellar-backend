@@ -23,6 +23,11 @@ async function main() {
       where: { id: 3 },
       update: {},
       create: { id: 3, name: 'Jefe' }
+    }),
+    prisma.role.upsert({
+      where: { id: 4 },
+      update: {},
+      create: { id: 4, name: 'Admin' }
     })
   ]);
   console.log('✅ Roles creados:', roles.map(r => r.name));
@@ -71,12 +76,12 @@ async function main() {
       password: adminPassword,
       phone: '1234567890',
       cuil: '12345678901',
-      roleId: 3,
+      roleId: 4,
       active: true
     }
   });
 
-  const adminBoss = await prisma.boss.upsert({
+  const admin = await prisma.admin.upsert({
     where: { userId: adminUser.id },
     update: {},
     create: {
@@ -84,6 +89,33 @@ async function main() {
     }
   });
   console.log('✅ Admin creado:', adminUser.email);
+
+  // Crear usuario jefe de mecánicos
+  console.log('👨‍💼 Creando usuario jefe de mecánicos...');
+  const bossPassword = await bcrypt.hash('jefe123', 12);
+  const bossUser = await prisma.user.upsert({
+    where: { email: 'jefe@taller.com' },
+    update: {},
+    create: {
+      name: 'Jefe',
+      lastName: 'Mecánicos',
+      email: 'jefe@taller.com',
+      password: bossPassword,
+      phone: '1234567895',
+      cuil: '12345678906',
+      roleId: 3,
+      active: true
+    }
+  });
+
+  const boss = await prisma.boss.upsert({
+    where: { userId: bossUser.id },
+    update: {},
+    create: {
+      userId: bossUser.id
+    }
+  });
+  console.log('✅ Jefe creado:', bossUser.email);
 
   // Crear usuarios mecánicos
   console.log('🔧 Creando usuarios mecánicos...');
@@ -109,7 +141,7 @@ async function main() {
     update: {},
     create: {
       userId: mechanic1User.id,
-      bossId: adminBoss.id
+      bossId: boss.id
     }
   });
 
@@ -133,7 +165,7 @@ async function main() {
     update: {},
     create: {
       userId: mechanic2User.id,
-      bossId: adminBoss.id
+      bossId: boss.id
     }
   });
   console.log('✅ Mecánicos creados:', [mechanic1User.email, mechanic2User.email]);
@@ -254,6 +286,7 @@ async function main() {
   console.log('\n🎉 ¡Seed completado exitosamente!');
   console.log('\n🔑 Credenciales de prueba:');
   console.log('👑 Admin: admin@taller.com / admin123');
+  console.log('👨‍💼 Jefe: jefe@taller.com / jefe123');
   console.log('🔧 Mecánico 1: mecanico1@taller.com / mecanico123');
   console.log('🔧 Mecánico 2: mecanico2@taller.com / mecanico123');
   console.log('👤 Cliente 1: cliente1@email.com / cliente123');

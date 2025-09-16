@@ -9,6 +9,7 @@ const carsRoutes = require('./routes/cars.routes');
 const repairsRoutes = require('./routes/repairs.routes');
 const usersRoutes = require('./routes/users.routes');
 const paymentsRoutes = require('./routes/payments.routes');
+const requestsRoutes = require('./routes/requests.routes');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -34,6 +35,7 @@ app.use('/api/cars', carsRoutes);
 app.use('/api/repairs', repairsRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/payments', paymentsRoutes);
+app.use('/api/requests', requestsRoutes);
 
 // Middleware para rutas no encontradas
 app.use('*', (req, res) => {
@@ -48,29 +50,22 @@ const startServer = async () => {
   try {
     // Verificar conexión a la base de datos
     await prisma.$connect();
-    console.log('✅ Conectado a la base de datos');
+    console.log('Conectado a la base de datos');
 
     // Iniciar servidor
     app.listen(PORT, () => {
-      console.log(`🚀 Servidor iniciado en puerto ${PORT}`);
-      console.log(`🔗 API disponible en: http://localhost:${PORT}/api`);
-      console.log(`💚 Health check: http://localhost:${PORT}/api/health`);
-      console.log(`🔐 Auth: http://localhost:${PORT}/api/auth`);
-      console.log(`🚗 Cars: http://localhost:${PORT}/api/cars`);
-      console.log(`🔧 Repairs: http://localhost:${PORT}/api/repairs`);
-      console.log(`👥 Users: http://localhost:${PORT}/api/users`);
-      console.log(`💰 Payments: http://localhost:${PORT}/api/payments`);
+      console.log(`Servidor corriendo en puerto ${PORT}`);
     });
 
   } catch (error) {
-    console.error('❌ Error al iniciar el servidor:', error);
+    console.error('Error al iniciar el servidor:', error);
     process.exit(1);
   }
 };
 
 // Manejo de señales de terminación
 process.on('SIGTERM', async () => {
-  console.log('🛑 Señal SIGTERM recibida. Cerrando servidor...');
+  console.log('Señal SIGTERM recibida. Cerrando servidor...');
   await prisma.$disconnect();
   process.exit(0);
 });
