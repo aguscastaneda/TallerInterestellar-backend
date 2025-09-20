@@ -35,10 +35,11 @@ model User {
   updatedAt DateTime @updatedAt
 
   // Relaciones
-  client     Client?
-  boss       Boss?
-  mechanic   Mechanic?
-  admin      Admin?
+  client        Client?
+  boss          Boss?
+  mechanic      Mechanic?
+  admin         Admin?
+  recepcionista Recepcionista?
   notifications Notification[]
 
   @@map("User")
@@ -79,6 +80,16 @@ model Admin {
   @@map("Admin")
 }
 
+model Recepcionista {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @unique
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("Recepcionista")
+}
+
 model Mechanic {
   id        Int      @id @default(autoincrement())
   userId    Int      @unique
@@ -100,6 +111,8 @@ model CarStatus {
   name String @db.VarChar(50)
   cars Car[]
 
+  @@unique([name])
+
   @@map("CarStatus")
 }
 
@@ -115,7 +128,7 @@ model Car {
   kms          Int?
   chassis      String?    @db.VarChar(50)
   description  String?    @db.Text
-  statusId     Int        @default(0) @db.TinyInt
+  statusId     Int        @default(1) @db.TinyInt
   status       CarStatus  @relation(fields: [statusId], references: [id])
   priority     Int        @default(1)
   estimatedDate DateTime?
@@ -144,16 +157,17 @@ model Repair {
 }
 
 model Payment {
-  id        Int      @id @default(autoincrement())
-  repairId  Int
-  repair    Repair   @relation(fields: [repairId], references: [id])
-  clientId  Int
-  client    Client   @relation(fields: [clientId], references: [id])
-  amount    Decimal  @db.Decimal(10, 2)
-  method    String   @db.VarChar(50)
-  status    String   @default("PENDIENTE") @db.VarChar(50)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         Int      @id @default(autoincrement())
+  repairId   Int
+  repair     Repair   @relation(fields: [repairId], references: [id])
+  clientId   Int
+  client     Client   @relation(fields: [clientId], references: [id])
+  amount     Decimal  @db.Decimal(10, 2)
+  method     String   @db.VarChar(50)
+  status     String   @default("PENDIENTE") @db.VarChar(50)
+  externalId String?  @db.VarChar(255) // MercadoPago preference ID
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   @@map("Payment")
 }
@@ -183,9 +197,21 @@ model ServiceRequest {
   assignedMechanicId   Int?
   assignedMechanic     Mechanic? @relation("AssignedMechanic", fields: [assignedMechanicId], references: [id])
   description          String    @db.Text
-  status               String    @db.VarChar(30) // PENDING, ASSIGNED, IN_PROGRESS, COMPLETED
+  status               String    @db.VarChar(30) // PENDING, ASSIGNED, IN_PROGRESS, COMPLETED (mapeado a pendiente/en reparacion/finalizado en UI)
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 
   @@map("ServiceRequest")
+}
+
+model PasswordReset {
+  id        Int      @id @default(autoincrement())
+  email     String   @db.VarChar(255)
+  token     String   @unique @db.VarChar(255)
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("PasswordReset")
 }

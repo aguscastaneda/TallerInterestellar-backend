@@ -28,37 +28,59 @@ async function main() {
       where: { id: 4 },
       update: {},
       create: { id: 4, name: 'Admin' }
+    }),
+    prisma.role.upsert({
+      where: { id: 5 },
+      update: {},
+      create: { id: 5, name: 'Recepcionista' }
     })
   ]);
   console.log('✅ Roles creados:', roles.map(r => r.name));
 
   // Crear estados de auto
   console.log('🚗 Creando estados de auto...');
+  
+  // Actualizar estados existentes y crear nuevos
   const carStatuses = await Promise.all([
     prisma.carStatus.upsert({
       where: { id: 1 },
-      update: {},
-      create: { id: 1, name: 'En Espera' }
+      update: { name: 'Entrada' },
+      create: { id: 1, name: 'Entrada' }
     }),
     prisma.carStatus.upsert({
       where: { id: 2 },
-      update: {},
-      create: { id: 2, name: 'En Reparación' }
+      update: { name: 'Pendiente' },
+      create: { id: 2, name: 'Pendiente' }
     }),
     prisma.carStatus.upsert({
       where: { id: 3 },
-      update: {},
-      create: { id: 3, name: 'Reparado' }
+      update: { name: 'En revision' },
+      create: { id: 3, name: 'En revision' }
     }),
     prisma.carStatus.upsert({
       where: { id: 4 },
-      update: {},
-      create: { id: 4, name: 'Entregado' }
+      update: { name: 'Rechazado' },
+      create: { id: 4, name: 'Rechazado' }
     }),
     prisma.carStatus.upsert({
       where: { id: 5 },
-      update: {},
-      create: { id: 5, name: 'Cancelado' }
+      update: { name: 'En reparacion' },
+      create: { id: 5, name: 'En reparacion' }
+    }),
+    prisma.carStatus.upsert({
+      where: { id: 6 },
+      update: { name: 'Finalizado' },
+      create: { id: 6, name: 'Finalizado' }
+    }),
+    prisma.carStatus.upsert({
+      where: { id: 7 },
+      update: { name: 'Entregado' },
+      create: { id: 7, name: 'Entregado' }
+    }),
+    prisma.carStatus.upsert({
+      where: { id: 8 },
+      update: { name: 'Cancelado' },
+      create: { id: 8, name: 'Cancelado' }
     })
   ]);
   console.log('✅ Estados de auto creados:', carStatuses.map(s => s.name));
@@ -221,6 +243,33 @@ async function main() {
   });
   console.log('✅ Clientes creados:', [client1User.email, client2User.email]);
 
+  // Crear usuario recepcionista
+  console.log('📋 Creando usuario recepcionista...');
+  const recepcionistaPassword = await bcrypt.hash('recepcionista123', 12);
+  const recepcionistaUser = await prisma.user.upsert({
+    where: { email: 'recepcionista@taller.com' },
+    update: {},
+    create: {
+      name: 'Ana',
+      lastName: 'Recepcionista',
+      email: 'recepcionista@taller.com',
+      password: recepcionistaPassword,
+      phone: '1234567897',
+      cuil: '12345678907',
+      roleId: 5,
+      active: true
+    }
+  });
+
+  const recepcionista = await prisma.recepcionista.upsert({
+    where: { userId: recepcionistaUser.id },
+    update: {},
+    create: {
+      userId: recepcionistaUser.id
+    }
+  });
+  console.log('✅ Recepcionista creado:', recepcionistaUser.email);
+
   // Crear autos
   console.log('🚗 Creando autos...');
   const car1 = await prisma.car.upsert({
@@ -291,6 +340,7 @@ async function main() {
   console.log('🔧 Mecánico 2: mecanico2@taller.com / mecanico123');
   console.log('👤 Cliente 1: cliente1@email.com / cliente123');
   console.log('👤 Cliente 2: cliente2@email.com / cliente123');
+  console.log('📋 Recepcionista: recepcionista@taller.com / recepcionista123');
 }
 
 main()

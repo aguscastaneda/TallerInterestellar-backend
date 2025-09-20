@@ -1,6 +1,8 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
 const { PrismaClient } = require('@prisma/client');
+const { CAR_STATUS } = require('../constants');
+const emailService = require('../services/emailService');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -33,7 +35,9 @@ router.get('/', async (req, res) => {
                     name: true,
                     lastName: true,
                     email: true,
-                    phone: true
+                    phone: true,
+                    cuil: true,
+                    createdAt: true
                   }
                 }
               }
@@ -89,7 +93,9 @@ router.get('/:id', async (req, res) => {
                     name: true,
                     lastName: true,
                     email: true,
-                    phone: true
+                    phone: true,
+                    cuil: true,
+                    createdAt: true
                   }
                 }
               }
@@ -234,10 +240,30 @@ router.post('/', [
     });
 
     // Actualizar el estado del auto a "En Reparación" (asumiendo que el ID 2 es "En Reparación")
-    await prisma.car.update({
+    const updatedCar = await prisma.car.update({
       where: { id: carId },
-      data: { statusId: 2 }
+      data: { statusId: CAR_STATUS.EN_REPARACION },
+      include: {
+        status: true,
+        client: {
+          include: {
+            user: true
+          }
+        },
+        mechanic: {
+          include: {
+            user: true
+          }
+        }
+      }
     });
+
+    // Send email notification
+    try {
+      await emailService.sendCarStateChangeNotification(updatedCar);
+    } catch (emailError) {
+      console.error('Error sending repair created email:', emailError);
+    }
 
     res.status(201).json({
       success: true,

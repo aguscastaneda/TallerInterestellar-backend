@@ -1,0 +1,94 @@
+// Constantes del sistema
+const ROLES = {
+  CLIENT: 1,
+  MECHANIC: 2,
+  BOSS: 3,
+  ADMIN: 4,
+  RECEPTIONIST: 5
+};
+
+const CAR_STATUS = {
+  ENTRADA: 1,
+  PENDIENTE: 2,
+  EN_REVISION: 3,
+  RECHAZADO: 4,
+  EN_REPARACION: 5,
+  FINALIZADO: 6,
+  ENTREGADO: 7,
+  CANCELADO: 8
+};
+
+const SERVICE_REQUEST_STATUS = {
+  PENDING: 'PENDING',
+  ASSIGNED: 'ASSIGNED',
+  IN_PROGRESS: 'IN_PROGRESS',
+  COMPLETED: 'COMPLETED'
+};
+
+const PAYMENT_STATUS = {
+  PENDIENTE: 'PENDIENTE',
+  PAGADO: 'PAGADO',
+  CANCELADO: 'CANCELADO'
+};
+
+const PAYMENT_METHODS = {
+  EFECTIVO: 'EFECTIVO',
+  TARJETA: 'TARJETA',
+  TRANSFERENCIA: 'TRANSFERENCIA'
+};
+
+// Mapeo de estados para traducción
+const STATUS_TRANSLATIONS = {
+  [SERVICE_REQUEST_STATUS.PENDING]: 'Pendiente',
+  [SERVICE_REQUEST_STATUS.ASSIGNED]: 'Asignada',
+  [SERVICE_REQUEST_STATUS.IN_PROGRESS]: 'En Progreso',
+  [SERVICE_REQUEST_STATUS.COMPLETED]: 'Completada'
+};
+
+// Colores para estados de autos
+const CAR_STATUS_COLORS = {
+  [CAR_STATUS.ENTRADA]: 'bg-gray-100 text-gray-800',
+  [CAR_STATUS.PENDIENTE]: 'bg-yellow-100 text-yellow-800',
+  [CAR_STATUS.EN_REVISION]: 'bg-blue-100 text-blue-800',
+  [CAR_STATUS.RECHAZADO]: 'bg-red-100 text-red-800',
+  [CAR_STATUS.EN_REPARACION]: 'bg-purple-100 text-purple-800',
+  [CAR_STATUS.FINALIZADO]: 'bg-green-100 text-green-800',
+  [CAR_STATUS.ENTREGADO]: 'bg-indigo-100 text-indigo-800',
+  [CAR_STATUS.CANCELADO]: 'bg-orange-100 text-orange-800'
+};
+
+// Colores para tabs de estados
+const CAR_STATUS_TAB_COLORS = {
+  [CAR_STATUS.ENTRADA]: 'bg-gray-500 hover:bg-gray-600',
+  [CAR_STATUS.PENDIENTE]: 'bg-yellow-500 hover:bg-yellow-600',
+  [CAR_STATUS.EN_REVISION]: 'bg-blue-500 hover:bg-blue-600',
+  [CAR_STATUS.RECHAZADO]: 'bg-red-500 hover:bg-red-600',
+  [CAR_STATUS.EN_REPARACION]: 'bg-purple-500 hover:bg-purple-600',
+  [CAR_STATUS.FINALIZADO]: 'bg-green-500 hover:bg-green-600',
+  [CAR_STATUS.ENTREGADO]: 'bg-indigo-500 hover:bg-indigo-600',
+  [CAR_STATUS.CANCELADO]: 'bg-orange-500 hover:bg-orange-600'
+};
+
+// Nombres de estados para emails
+const CAR_STATUS_NAMES = {
+  [CAR_STATUS.ENTRADA]: 'Entrada',
+  [CAR_STATUS.PENDIENTE]: 'Pendiente',
+  [CAR_STATUS.EN_REVISION]: 'En Revisión',
+  [CAR_STATUS.RECHAZADO]: 'Rechazado',
+  [CAR_STATUS.EN_REPARACION]: 'En Reparación',
+  [CAR_STATUS.FINALIZADO]: 'Finalizado',
+  [CAR_STATUS.ENTREGADO]: 'Entregado',
+  [CAR_STATUS.CANCELADO]: 'Cancelado'
+};
+
+module.exports = {
+  ROLES,
+  CAR_STATUS,
+  SERVICE_REQUEST_STATUS,
+  PAYMENT_STATUS,
+  PAYMENT_METHODS,
+  STATUS_TRANSLATIONS,
+  CAR_STATUS_COLORS,
+  CAR_STATUS_TAB_COLORS,
+  CAR_STATUS_NAMES
+};

@@ -5,551 +5,293 @@ const { PrismaClient } = require('@prisma/client');
 const router = express.Router();
 const prisma = new PrismaClient();
 
-// Middleware para validar errores de validación
+// MercadoPago Configuration
+let mercadoPago = null;
+let isConfigured = false;
+
+try {
+  const { MercadoPagoConfig, Preference } = require('mercadopago');
+  
+  if (!process.env.MP_KEY) {
+    throw new Error('MP_KEY environment variable is required');
+  }
+  
+  const client = new MercadoPagoConfig({
+    accessToken: process.env.MP_KEY,
+    options: {
+      timeout: 5000
+    }
+  });
+  
+  mercadoPago = {
+    preference: new Preference(client)
+  };
+  
+  isConfigured = true;
+  console.log('MercadoPago SDK configured successfully');
+  
+} catch (error) {
+  console.warn('MercadoPago SDK not available:', error.message);
+  console.warn('Running in simulation mode for development');
+  isConfigured = false;
+}
+
+// Environment Configuration
+const config = {
+  frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
+  backendUrl: process.env.BACKEND_URL || 'http://localhost:3001',
+  isProduction: process.env.NODE_ENV === 'production'
+};
+
+// Validation Middleware
 const handleValidationErrors = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({
       success: false,
-      message: 'Datos de entrada inválidos',
+      message: 'Invalid input data',
       errors: errors.array()
     });
   }
   next();
 };
 
-// GET /api/payments - Obtener todos los pagos
-router.get('/', async (req, res) => {
-  try {
-    const payments = await prisma.payment.findMany({
-      include: {
-        repair: {
-          include: {
-            car: {
-              include: {
-                client: {
-                  include: {
-                    user: {
-                      select: {
-                        id: true,
-                        name: true,
-                        lastName: true,
-                        email: true,
-                        phone: true
-                      }
-                    }
-                  }
-                }
-              }
-            },
-            mechanic: {
-              include: {
-                user: {
-                  select: {
-                    id: true,
-                    name: true,
-                    lastName: true
-                  }
-                }
-              }
-            }
-          }
-        },
-        client: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                lastName: true,
-                email: true,
-                phone: true
-              }
-            }
-          }
-        }
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    });
-    
-    res.json({
-      success: true,
-      data: payments
-    });
-  } catch (error) {
-    console.error('Error al obtener pagos:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error interno del servidor'
-    });
-  }
-});
+// Utility Functions
+const formatPhoneNumber = (phone) => {
+  if (!phone) return '11111111';
+  return phone.replace(/[^0-9]/g, '').slice(-8).padStart(8, '1');
+};
 
-// GET /api/payments/:id - Obtener pago por ID
-router.get('/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    const payment = await prisma.payment.findUnique({
-      where: { id: parseInt(id) },
-      include: {
-        repair: {
-          include: {
-            car: {
-              include: {
-                client: {
-                  include: {
-                    user: {
-                      select: {
-                        id: true,
-                        name: true,
-                        lastName: true,
-                        email: true,
-                        phone: true
-                      }
-                    }
-                  }
-                }
-              }
-            },
-            mechanic: {
-              include: {
-                user: {
-                  select: {
-                    id: true,
-                    name: true,
-                    lastName: true
-                  }
-                }
-              }
-            }
-          }
-        },
-        client: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                lastName: true,
-                email: true,
-                phone: true
-              }
-            }
-          }
-        }
-      }
-    });
+const generateFallbackEmail = (clientId) => {
+  return `client${clientId}@taller-interestellar.com`;
+};
 
-    if (!payment) {
-      return res.status(404).json({
-        success: false,
-        message: 'Pago no encontrado'
-      });
-    }
-
-    res.json({
-      success: true,
-      data: payment
-    });
-  } catch (error) {
-    console.error('Error al obtener pago:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error interno del servidor'
-    });
-  }
-});
-
-// POST /api/payments - Crear nuevo pago
-router.post('/', [
-  body('repairId').isInt({ min: 1 }),
-  body('clientId').isInt({ min: 1 }),
-  body('amount').isFloat({ min: 0 }),
-  body('method').notEmpty().trim(),
-  body('status').optional().isIn(['PENDIENTE', 'PAGADO', 'CANCELADO']),
+// POST /api/payments/create-preference - Create MercadoPago preference
+router.post('/create-preference', [
+  body('repairId').isInt({ min: 1 }).withMessage('Valid repair ID is required'),
+  body('clientId').isInt({ min: 1 }).withMessage('Valid client ID is required'),
   handleValidationErrors
 ], async (req, res) => {
   try {
-    const {
-      repairId,
-      clientId,
-      amount,
-      method,
-      status = 'PENDIENTE'
-    } = req.body;
+    const { repairId, clientId } = req.body;
+    
+    console.log('Starting payment process:', { repairId, clientId });
 
-    // Verificar si la reparación existe
+    // Fetch repair with complete data
     const repair = await prisma.repair.findUnique({
-      where: { id: repairId }
+      where: { id: parseInt(repairId) },
+      include: {
+        car: {
+          include: {
+            client: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                    lastName: true,
+                    email: true,
+                    phone: true
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     });
 
+    // Validation: Repair exists
     if (!repair) {
-      return res.status(400).json({
+      return res.status(404).json({
         success: false,
-        message: 'Reparación no encontrada'
+        message: 'Repair not found'
       });
     }
 
-    // Verificar si el cliente existe
-    const client = await prisma.client.findUnique({
-      where: { id: clientId }
+    // Validation: Client ownership
+    if (repair.car.client.id !== parseInt(clientId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'You do not have permission to pay for this repair'
+      });
+    }
+
+    // Validation: Repair cost
+    const repairCost = parseFloat(repair.cost);
+    if (!repairCost || repairCost <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid repair cost for payment processing'
+      });
+    }
+
+    // Validation: No pending payments
+    const existingPayment = await prisma.payment.findFirst({
+      where: {
+        repairId: parseInt(repairId),
+        status: 'PENDIENTE'
+      }
     });
 
-    if (!client) {
+    if (existingPayment) {
       return res.status(400).json({
         success: false,
-        message: 'Cliente no encontrado'
+        message: 'A pending payment already exists for this repair'
       });
     }
 
-    // Verificar que el cliente sea el dueño del auto de la reparación
-    if (repair.carId !== client.cars?.[0]?.id) {
+    // Validation: User data completeness
+    const user = repair.car.client.user;
+    if (!user.name || !user.lastName) {
       return res.status(400).json({
         success: false,
-        message: 'El cliente no es el dueño del auto de esta reparación'
+        message: 'Incomplete user information. Name and surname are required.'
       });
     }
 
-    // Crear el pago
+    console.log('Validation passed. Creating payment preference...');
+
+    // === SIMULATION MODE ===
+    if (!isConfigured) {
+      console.log('Using simulation mode');
+      
+      const simulationPayment = await prisma.payment.create({
+        data: {
+          repairId: parseInt(repairId),
+          clientId: parseInt(clientId),
+          amount: repairCost,
+          method: 'MERCADOPAGO_SIMULATION',
+          status: 'PENDIENTE',
+          externalId: `sim_${Date.now()}_${repairId}`
+        }
+      });
+
+      const simulationUrl = `${config.frontendUrl}/home/client/repairs?payment=success&simulation=true`;
+      
+      return res.json({
+        success: true,
+        message: 'Simulation payment created (MercadoPago not available)',
+        data: {
+          payment: simulationPayment,
+          preferenceId: `sim_${Date.now()}`,
+          initPoint: simulationUrl,
+          sandboxInitPoint: simulationUrl,
+          simulation: true
+        }
+      });
+    }
+
+    // === MERCADOPAGO INTEGRATION ===
+    
+    // Prepare preference data
+    const preferenceData = {
+      items: [{
+        id: `repair_${repair.id}`,
+        title: `Repair ${repair.car.brand} ${repair.car.model} - ${repair.car.licensePlate}`,
+        description: repair.description || 'Vehicle repair service',
+        quantity: 1,
+        unit_price: repairCost
+      }],
+      
+      payer: {
+        name: user.name,
+        surname: user.lastName,
+        email: user.email || generateFallbackEmail(repair.car.client.id),
+        phone: {
+          area_code: '11',
+          number: formatPhoneNumber(user.phone)
+        }
+      },
+      
+      back_urls: {
+        success: `${config.frontendUrl}/home/client/repairs?payment=success`,
+        failure: `${config.frontendUrl}/home/client/repairs?payment=failure`,
+        pending: `${config.frontendUrl}/home/client/repairs?payment=pending`
+      },
+      
+      notification_url: `${config.backendUrl}/api/payments/webhook`,
+      external_reference: `repair_${repair.id}_client_${clientId}`,
+      
+      payment_methods: {
+        excluded_payment_methods: [],
+        excluded_payment_types: [],
+        installments: 12
+      }
+    };
+
+    console.log('MercadoPago preference data:', JSON.stringify(preferenceData, null, 2));
+
+    // Create MercadoPago preference
+    const mpPreference = await mercadoPago.preference.create({
+      body: preferenceData
+    });
+
+    console.log('MercadoPago preference created:', mpPreference.id);
+
+    // Create payment record in database
     const payment = await prisma.payment.create({
       data: {
-        repairId,
-        clientId,
-        amount: parseFloat(amount),
-        method,
-        status
-      },
-      include: {
-        repair: {
-          include: {
-            car: {
-              include: {
-                client: {
-                  include: {
-                    user: {
-                      select: {
-                        id: true,
-                        name: true,
-                        lastName: true,
-                        email: true,
-                        phone: true
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        client: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                lastName: true,
-                email: true,
-                phone: true
-              }
-            }
-          }
-        }
-      }
-    });
-
-    res.status(201).json({
-      success: true,
-      message: 'Pago creado exitosamente',
-      data: payment
-    });
-
-  } catch (error) {
-    console.error('Error al crear pago:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error interno del servidor'
-    });
-  }
-});
-
-// PUT /api/payments/:id - Actualizar pago
-router.put('/:id', [
-  body('amount').optional().isFloat({ min: 0 }),
-  body('method').optional().trim(),
-  body('status').optional().isIn(['PENDIENTE', 'PAGADO', 'CANCELADO']),
-  handleValidationErrors
-], async (req, res) => {
-  try {
-    const { id } = req.params;
-    const updateData = req.body;
-
-    // Verificar si el pago existe
-    const existingPayment = await prisma.payment.findUnique({
-      where: { id: parseInt(id) }
-    });
-
-    if (!existingPayment) {
-      return res.status(404).json({
-        success: false,
-        message: 'Pago no encontrado'
-      });
-    }
-
-    // Convertir monto si se proporciona
-    if (updateData.amount) {
-      updateData.amount = parseFloat(updateData.amount);
-    }
-
-    // Actualizar el pago
-    const updatedPayment = await prisma.payment.update({
-      where: { id: parseInt(id) },
-      data: updateData,
-      include: {
-        repair: {
-          include: {
-            car: {
-              include: {
-                client: {
-                  include: {
-                    user: {
-                      select: {
-                        id: true,
-                        name: true,
-                        lastName: true,
-                        email: true,
-                        phone: true
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        client: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                lastName: true,
-                email: true,
-                phone: true
-              }
-            }
-          }
-        }
+        repairId: parseInt(repairId),
+        clientId: parseInt(clientId),
+        amount: repairCost,
+        method: 'MERCADOPAGO',
+        status: 'PENDIENTE',
+        externalId: mpPreference.id
       }
     });
 
     res.json({
       success: true,
-      message: 'Pago actualizado exitosamente',
-      data: updatedPayment
+      message: 'Payment preference created successfully',
+      data: {
+        payment,
+        preferenceId: mpPreference.id,
+        initPoint: mpPreference.init_point,
+        sandboxInitPoint: mpPreference.sandbox_init_point
+      }
     });
 
   } catch (error) {
-    console.error('Error al actualizar pago:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error interno del servidor'
-    });
-  }
-});
-
-// DELETE /api/payments/:id - Eliminar pago
-router.delete('/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    // Verificar si el pago existe
-    const existingPayment = await prisma.payment.findUnique({
-      where: { id: parseInt(id) }
-    });
-
-    if (!existingPayment) {
-      return res.status(404).json({
-        success: false,
-        message: 'Pago no encontrado'
-      });
-    }
-
-    // Solo permitir eliminar pagos pendientes
-    if (existingPayment.status !== 'PENDIENTE') {
+    console.error('Error creating payment preference:', error);
+    
+    // Handle specific MercadoPago errors
+    if (error.status && error.message) {
       return res.status(400).json({
         success: false,
-        message: 'Solo se pueden eliminar pagos pendientes'
+        message: 'MercadoPago API error',
+        details: error.message,
+        mpError: true
       });
     }
-
-    // Eliminar el pago
-    await prisma.payment.delete({
-      where: { id: parseInt(id) }
-    });
-
-    res.json({
-      success: true,
-      message: 'Pago eliminado exitosamente'
-    });
-
-  } catch (error) {
-    console.error('Error al eliminar pago:', error);
+    
     res.status(500).json({
       success: false,
-      message: 'Error interno del servidor'
+      message: 'Internal server error',
+      error: config.isProduction ? undefined : error.message
     });
   }
 });
 
-// GET /api/payments/repair/:repairId - Obtener pagos por reparación
-router.get('/repair/:repairId', async (req, res) => {
+// POST /api/payments/webhook - MercadoPago webhook
+router.post('/webhook', async (req, res) => {
   try {
-    const { repairId } = req.params;
+    const { type, data } = req.body;
     
-    const payments = await prisma.payment.findMany({
-      where: { repairId: parseInt(repairId) },
-      include: {
-        client: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                lastName: true,
-                email: true,
-                phone: true
-              }
-            }
-          }
-        }
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    });
+    console.log('Webhook received:', { type, data });
     
-    res.json({
-      success: true,
-      data: payments
-    });
+    if (type === 'payment') {
+      const paymentId = data.id;
+      console.log(`Payment notification received: ${paymentId}`);
+      
+      // Here you could update payment status based on MercadoPago response
+      // For now, we'll just acknowledge receipt
+    }
+    
+    res.status(200).send('OK');
   } catch (error) {
-    console.error('Error al obtener pagos por reparación:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error interno del servidor'
-    });
-  }
-});
-
-// GET /api/payments/client/:clientId - Obtener pagos por cliente
-router.get('/client/:clientId', async (req, res) => {
-  try {
-    const { clientId } = req.params;
-    
-    const payments = await prisma.payment.findMany({
-      where: { clientId: parseInt(clientId) },
-      include: {
-        repair: {
-          include: {
-            car: {
-              include: {
-                client: {
-                  include: {
-                    user: {
-                      select: {
-                        id: true,
-                        name: true,
-                        lastName: true,
-                        email: true,
-                        phone: true
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    });
-    
-    res.json({
-      success: true,
-      data: payments
-    });
-  } catch (error) {
-    console.error('Error al obtener pagos por cliente:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error interno del servidor'
-    });
-  }
-});
-
-// GET /api/payments/status/:status - Obtener pagos por estado
-router.get('/status/:status', async (req, res) => {
-  try {
-    const { status } = req.params;
-    
-    const payments = await prisma.payment.findMany({
-      where: { status: status.toUpperCase() },
-      include: {
-        repair: {
-          include: {
-            car: {
-              include: {
-                client: {
-                  include: {
-                    user: {
-                      select: {
-                        id: true,
-                        name: true,
-                        lastName: true,
-                        email: true,
-                        phone: true
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        client: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                lastName: true,
-                email: true,
-                phone: true
-              }
-            }
-          }
-        }
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    });
-    
-    res.json({
-      success: true,
-      data: payments
-    });
-  } catch (error) {
-    console.error('Error al obtener pagos por estado:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error interno del servidor'
-    });
+    console.error('Webhook error:', error);
+    res.status(500).send('Error');
   }
 });
 

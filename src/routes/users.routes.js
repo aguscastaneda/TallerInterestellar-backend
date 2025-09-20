@@ -2,6 +2,7 @@ const express = require('express');
 const { body, validationResult } = require('express-validator');
 const bcrypt = require('bcryptjs');
 const { PrismaClient } = require('@prisma/client');
+const { ROLES } = require('../constants');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -23,7 +24,7 @@ const handleValidationErrors = (req, res, next) => {
 router.post('/', [
   body('name').notEmpty().trim(),
   body('lastName').notEmpty().trim(),
-  body('email').isEmail().normalizeEmail(),
+  body('email').isEmail(),
   body('password').isLength({ min: 6 }),
   body('cuil').optional().trim(),
   body('phone').optional().trim(),
@@ -95,30 +96,34 @@ router.post('/', [
     });
 
     // Crear perfil específico según el rol
-    if (roleId === 1) { // Cliente
+    if (roleId === ROLES.CLIENT) {
       await prisma.client.create({
         data: { userId: user.id }
       });
-    } else if (roleId === 2) { // Mecánico
+    } else if (roleId === ROLES.MECHANIC) {
       const mechanic = await prisma.mechanic.create({
         data: { 
           userId: user.id,
           bossId: req.body.bossId ? parseInt(req.body.bossId) : null
         }
       });
-    } else if (roleId === 3) { // Jefe
+    } else if (roleId === ROLES.BOSS) {
       await prisma.boss.create({
         data: { userId: user.id }
       });
-    } else if (roleId === 4) { // Admin
+    } else if (roleId === ROLES.ADMIN) {
       await prisma.admin.create({
+        data: { userId: user.id }
+      });
+    } else if (roleId === ROLES.RECEPTIONIST) {
+      await prisma.recepcionista.create({
         data: { userId: user.id }
       });
     }
 
     // Obtener el usuario con su perfil específico
     let userWithProfile = user;
-    if (roleId === 2) { // Mecánico
+    if (roleId === ROLES.MECHANIC) {
       userWithProfile = await prisma.user.findUnique({
         where: { id: user.id },
         include: {
@@ -246,7 +251,7 @@ router.put('/:id', [
   body('lastName').optional().trim(),
   body('phone').optional().trim(),
   body('cuil').optional().trim(),
-  body('email').optional().isEmail().normalizeEmail(),
+  body('email').optional().isEmail(),
   body('password').optional().isLength({ min: 6 }),
   body('active').optional().isBoolean(),
   handleValidationErrors

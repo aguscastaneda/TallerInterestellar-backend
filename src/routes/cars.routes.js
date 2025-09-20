@@ -31,7 +31,9 @@ router.get('/', async (req, res) => {
                 name: true,
                 lastName: true,
                 email: true,
-                phone: true
+                phone: true,
+                cuil: true,
+                createdAt: true
               }
             }
           }
@@ -74,7 +76,7 @@ router.get('/plate/:licensePlate', async (req, res) => {
     const car = await prisma.car.findUnique({
       where: { licensePlate },
       include: {
-        client: { include: { user: { select: { id: true, name: true, lastName: true, email: true, phone: true } } } },
+        client: { include: { user: { select: { id: true, name: true, lastName: true, email: true, phone: true, cuil: true, createdAt: true } } } },
         mechanic: { include: { user: { select: { id: true, name: true, lastName: true } } } },
         status: true
       }
@@ -126,7 +128,9 @@ router.get('/:id', async (req, res) => {
                 name: true,
                 lastName: true,
                 email: true,
-                phone: true
+                phone: true,
+                cuil: true,
+                createdAt: true
               }
             }
           }
@@ -259,7 +263,9 @@ router.post('/', [
                 name: true,
                 lastName: true,
                 email: true,
-                phone: true
+                phone: true,
+                cuil: true,
+                createdAt: true
               }
             }
           }
@@ -359,7 +365,9 @@ router.put('/:id', [
                 name: true,
                 lastName: true,
                 email: true,
-                phone: true
+                phone: true,
+                cuil: true,
+                createdAt: true
               }
             }
           }
@@ -458,7 +466,9 @@ router.get('/status/:statusId', async (req, res) => {
                 name: true,
                 lastName: true,
                 email: true,
-                phone: true
+                phone: true,
+                cuil: true,
+                createdAt: true
               }
             }
           }

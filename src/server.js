@@ -10,6 +10,10 @@ const repairsRoutes = require('./routes/repairs.routes');
 const usersRoutes = require('./routes/users.routes');
 const paymentsRoutes = require('./routes/payments.routes');
 const requestsRoutes = require('./routes/requests.routes');
+const carStatesRoutes = require('./routes/car-states.routes');
+const clientRepairsRoutes = require('./routes/client-repairs.routes');
+const configRoutes = require('./routes/config.routes');
+const emailRoutes = require('./routes/email.routes');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -36,6 +40,10 @@ app.use('/api/repairs', repairsRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/payments', paymentsRoutes);
 app.use('/api/requests', requestsRoutes);
+app.use('/api/car-states', carStatesRoutes);
+app.use('/api/client-repairs', clientRepairsRoutes);
+app.use('/api/config', configRoutes);
+app.use('/api/email', emailRoutes);
 
 // Middleware para rutas no encontradas
 app.use('*', (req, res) => {
