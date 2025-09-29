@@ -22,7 +22,7 @@ class EmailService {
       // Configure Brevo API
       let defaultClient = SibApiV3Sdk.ApiClient.instance;
       let apiKey = defaultClient.authentications['api-key'];
-      apiKey.apiKey = process.env.BREVO_API_KEY || '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';
+      apiKey.apiKey = process.env.BREVO_API_KEY;
       
       this.apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
       
