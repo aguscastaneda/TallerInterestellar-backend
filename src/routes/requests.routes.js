@@ -272,7 +272,186 @@ router.put('/:id/status', [
   }
 });
 
-module.exports = router;
+// POST /api/requests/:id/budget - Create and send budget (mechanic)
+router.post('/:id/budget', [
+  body('description').notEmpty().trim(),
+  body('cost').isFloat({ min: 0 }),
+  handleValidationErrors
+], async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { description, cost } = req.body;
+
+    // Get the service request with all necessary data
+    const request = await prisma.serviceRequest.findUnique({
+      where: { id: parseInt(id) },
+      include: {
+        car: { 
+          include: { 
+            status: true,
+            client: {
+              include: {
+                user: true
+              }
+            }
+          } 
+        },
+        client: { 
+          include: { 
+            user: { 
+              select: { 
+                id: true, 
+                name: true, 
+                lastName: true,
+                email: true
+              } 
+            } 
+          } 
+        },
+        assignedMechanic: { 
+          include: { 
+            user: { 
+              select: { 
+                id: true, 
+                name: true, 
+                lastName: true 
+              } 
+            } 
+          } 
+        }
+      }
+    });
+
+    if (!request) {
+      return res.status(404).json({ success: false, message: 'Solicitud no encontrada' });
+    }
+
+    // Update request status to PRESUPUESTO_ENVIADO
+    const updatedRequest = await prisma.serviceRequest.update({
+      where: { id: parseInt(id) },
+      data: { status: SERVICE_REQUEST_STATUS.PRESUPUESTO_ENVIADO }
+    });
+
+    // Update car status to PENDIENTE (waiting for client response)
+    const updatedCar = await prisma.car.update({
+      where: { id: request.carId },
+      data: { statusId: CAR_STATUS.PENDIENTE },
+      include: {
+        status: true,
+        client: {
+          include: {
+            user: true
+          }
+        }
+      }
+    });
+
+    // Send budget email to client
+    const budgetData = {
+      description,
+      cost: parseFloat(cost)
+    };
+
+    try {
+      await emailService.sendBudgetEmail(updatedCar, budgetData);
+    } catch (emailError) {
+      console.error('Error sending budget email:', emailError);
+      // Don't fail the request if email fails
+    }
+
+    res.json({ 
+      success: true, 
+      message: 'Presupuesto enviado al cliente', 
+      data: { request: updatedRequest, car: updatedCar } 
+    });
+  } catch (error) {
+    console.error('Error al enviar presupuesto:', error);
+    res.status(500).json({ success: false, message: 'Error interno del servidor' });
+  }
+});
+
+// POST /api/requests/:id/cancel - Cancelar solicitud (cliente)
+router.post('/:id/cancel', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Get the service request with all necessary data
+    const request = await prisma.serviceRequest.findUnique({
+      where: { id: parseInt(id) },
+      include: {
+        car: { 
+          include: { 
+            status: true,
+            client: {
+              include: {
+                user: true
+              }
+            }
+          } 
+        },
+        client: { 
+          include: { 
+            user: { 
+              select: { 
+                id: true, 
+                name: true, 
+                lastName: true,
+                email: true
+              } 
+            } 
+          } 
+        }
+      }
+    });
+
+    if (!request) {
+      return res.status(404).json({ success: false, message: 'Solicitud no encontrada' });
+    }
+
+    // Update request status to CANCELLED
+    const updatedRequest = await prisma.serviceRequest.update({
+      where: { id: parseInt(id) },
+      data: { status: SERVICE_REQUEST_STATUS.CANCELLED }
+    });
+
+    // Update car status to CANCELADO y entonces a ENTRADA
+    await prisma.car.update({
+      where: { id: request.carId },
+      data: { statusId: CAR_STATUS.CANCELADO }
+    });
+
+    const updatedCar = await prisma.car.update({
+      where: { id: request.carId },
+      data: { statusId: CAR_STATUS.ENTRADA },
+      include: {
+        status: true,
+        client: {
+          include: {
+            user: true
+          }
+        }
+      }
+    });
+
+    // Send email notification
+    try {
+      await emailService.sendCarStateChangeNotification(updatedCar);
+    } catch (emailError) {
+      console.error('Error sending cancellation email:', emailError);
+      // Don't fail the request if email fails
+    }
+
+    res.json({ 
+      success: true, 
+      message: 'Solicitud cancelada exitosamente', 
+      data: { request: updatedRequest, car: updatedCar } 
+    });
+  } catch (error) {
+    console.error('Error al cancelar solicitud:', error);
+    res.status(500).json({ success: false, message: 'Error interno del servidor' });
+  }
+});
+
 // GET /api/requests/mechanic/:mechanicId - Solicitudes por mecánico asignado
 router.get('/mechanic/:mechanicId', async (req, res) => {
   try {
@@ -331,4 +510,4 @@ router.get('/client/:clientId', async (req, res) => {
   }
 });
 
-
+module.exports = router;

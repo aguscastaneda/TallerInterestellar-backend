@@ -1,6 +1,6 @@
 const express = require('express');
 const { PrismaClient } = require('@prisma/client');
-const { CAR_STATUS } = require('../constants');
+const { CAR_STATUS, SERVICE_REQUEST_STATUS } = require('../constants');
 const emailService = require('../services/emailService');
 
 const router = express.Router();
@@ -127,6 +127,42 @@ router.post('/accept-budget', async (req, res) => {
       });
     }
 
+    // Find the service request associated with this car that has PRESUPUESTO_ENVIADO status and is assigned to a mechanic
+    const serviceRequest = await prisma.serviceRequest.findFirst({
+      where: { 
+        carId: parseInt(carId),
+        status: SERVICE_REQUEST_STATUS.PRESUPUESTO_ENVIADO,
+        assignedMechanicId: {
+          not: null
+        }
+      },
+      include: {
+        car: { 
+          include: { 
+            status: true,
+            client: {
+              include: {
+                user: true
+              }
+            }
+          } 
+        }
+      }
+    });
+
+    if (!serviceRequest) {
+      return res.status(400).json({
+        success: false,
+        message: 'No se encontró una solicitud de servicio con presupuesto enviado asignada a un mecánico para este vehículo'
+      });
+    }
+
+    // Update the service request status to IN_REPAIR
+    const updatedServiceRequest = await prisma.serviceRequest.update({
+      where: { id: serviceRequest.id },
+      data: { status: SERVICE_REQUEST_STATUS.IN_REPAIR }
+    });
+
     // Cambiar estado a "En reparacion"
     const updatedCar = await prisma.car.update({
       where: { id: parseInt(carId) },
@@ -151,7 +187,7 @@ router.post('/accept-budget', async (req, res) => {
     res.json({
       success: true,
       message: 'Presupuesto aceptado, auto en reparación',
-      data: updatedCar
+      data: { car: updatedCar, serviceRequest: updatedServiceRequest }
     });
 
   } catch (error) {
@@ -174,6 +210,30 @@ router.post('/reject-budget', async (req, res) => {
         message: 'carId es requerido'
       });
     }
+
+    // Find the service request associated with this car that has PRESUPUESTO_ENVIADO status and is assigned to a mechanic
+    const serviceRequest = await prisma.serviceRequest.findFirst({
+      where: { 
+        carId: parseInt(carId),
+        status: SERVICE_REQUEST_STATUS.PRESUPUESTO_ENVIADO,
+        assignedMechanicId: {
+          not: null
+        }
+      }
+    });
+
+    if (!serviceRequest) {
+      return res.status(400).json({
+        success: false,
+        message: 'No se encontró una solicitud de servicio con presupuesto enviado asignada a un mecánico para este vehículo'
+      });
+    }
+
+    // Mark it as rejected
+    await prisma.serviceRequest.update({
+      where: { id: serviceRequest.id },
+      data: { status: SERVICE_REQUEST_STATUS.REJECTED }
+    });
 
     // Cambiar estado a "Rechazado" y luego a "Entrada"
     await prisma.car.update({

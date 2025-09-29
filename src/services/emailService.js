@@ -1,4 +1,4 @@
-const nodemailer = require('nodemailer');
+const SibApiV3Sdk = require('sib-api-v3-sdk');
 
 // Import email templates
 const { loginConfirmationTemplate } = require('../templates/loginConfirmationTemplate');
@@ -6,58 +6,38 @@ const { welcomeEmailTemplate } = require('../templates/welcomeEmailTemplate');
 const { passwordResetTemplate } = require('../templates/passwordResetTemplate');
 const { testEmailTemplate } = require('../templates/testEmailTemplate');
 const { carStateChangeTemplate } = require('../templates/carStateChangeTemplate');
+const { budgetTemplate } = require('../templates/budgetTemplate');
 
 // Email Service Configuration
 class EmailService {
   constructor() {
-    this.transporter = null;
     this.isConfigured = false;
+    this.apiInstance = null;
+    this.sender = null;
     this.init();
   }
 
   init() {
     try {
-      // Validate required environment variables
-      const requiredVars = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS'];
-      for (const varName of requiredVars) {
-        if (!process.env[varName]) {
-          throw new Error(`Missing required environment variable: ${varName}`);
-        }
-      }
-
-      // Create nodemailer transporter
-      this.transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: parseInt(process.env.SMTP_PORT),
-        secure: process.env.SMTP_SECURE === 'true',
-        auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS
-        },
-        tls: {
-          rejectUnauthorized: false
-        }
-      });
+      // Configure Brevo API
+      let defaultClient = SibApiV3Sdk.ApiClient.instance;
+      let apiKey = defaultClient.authentications['api-key'];
+      apiKey.apiKey = process.env.BREVO_API_KEY || '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';
+      
+      this.apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
+      
+      // Set sender information
+      this.sender = {
+        email: process.env.BREVO_SENDER_EMAIL || "info@tallerinterestellar.com.ar",
+        name: process.env.BREVO_SENDER_NAME || "Taller Interestellar"
+      };
 
       this.isConfigured = true;
-      console.log('Email service configured successfully');
-
-      // Test the connection
-      this.testConnection();
+      console.log('Brevo Email service configured successfully');
 
     } catch (error) {
       console.warn('Email service not available:', error.message);
       console.warn('Email notifications will be disabled');
-      this.isConfigured = false;
-    }
-  }
-
-  async testConnection() {
-    try {
-      await this.transporter.verify();
-      console.log('SMTP connection verified successfully');
-    } catch (error) {
-      console.error('SMTP connection failed:', error.message);
       this.isConfigured = false;
     }
   }
@@ -70,24 +50,36 @@ class EmailService {
     }
 
     try {
-      const mailOptions = {
-        from: {
-          name: process.env.SMTP_FROM_NAME || 'Taller Interestellar',
-          address: process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER
-        },
-        to,
-        subject,
-        html,
-        text
+      // Format recipients
+      let recipients;
+      if (Array.isArray(to)) {
+        recipients = to.map(email => {
+          if (typeof email === 'string') {
+            return { email };
+          }
+          return email;
+        });
+      } else if (typeof to === 'string') {
+        recipients = [{ email: to }];
+      } else {
+        recipients = [to];
+      }
+
+      let sendSmtpEmail = {
+        sender: this.sender,
+        to: recipients,
+        subject: subject,
+        htmlContent: html,
+       textContent: text
       };
 
-      console.log('Sending email to:', to);
-      const result = await this.transporter.sendMail(mailOptions);
+      console.log('Sending email to:', recipients.map(r => r.email).join(', '));
+      const data = await this.apiInstance.sendTransacEmail(sendSmtpEmail);
       
-      console.log('Email sent successfully:', result.messageId);
+      console.log('Email sent successfully:', data.messageId);
       return { 
         success: true, 
-        messageId: result.messageId,
+        messageId: data.messageId,
         message: 'Email sent successfully' 
       };
 
@@ -210,6 +202,46 @@ class EmailService {
       })}
 
       Para más detalles, acceda a nuestro sistema en línea.
+
+      Gracias por confiar en Taller Interestellar.
+
+      El equipo de Taller Interestellar
+    `;
+
+    return await this.sendEmail({
+      to: userEmail,
+      subject,
+      html,
+      text: textVersion
+    });
+  }
+
+  // Budget email for clients
+  async sendBudgetEmail(carData, budgetData) {
+    if (!carData || !carData.client || !carData.client.user || !carData.client.user.email) {
+      console.warn('Incomplete car data for budget email');
+      return { success: false, message: 'Incomplete car data' };
+    }
+
+    const userEmail = carData.client.user.email;
+    const userName = `${carData.client.user.name} ${carData.client.user.lastName}`;
+    
+    const subject = `Presupuesto para su vehículo ${carData.licensePlate} - Taller Interestellar`;
+    const html = budgetTemplate(carData, budgetData, userName);
+    
+    const textVersion = `
+      Hola ${userName},
+
+      Le informamos que nuestro mecánico ha preparado un presupuesto detallado para la reparación de su vehículo ${carData.licensePlate}.
+
+      Detalles del Presupuesto:
+      Descripción del trabajo: ${budgetData.description}
+      Costo estimado: $${parseFloat(budgetData.cost).toFixed(2)}
+
+      Por favor, revise el presupuesto y confirme si desea proceder con la reparación o rechazarla.
+      
+      Para aceptar el presupuesto: ${process.env.FRONTEND_URL || 'http://localhost:5173'}/accept-budget?carId=${carData.id}
+      Para rechazar el presupuesto: ${process.env.FRONTEND_URL || 'http://localhost:5173'}/reject-budget?carId=${carData.id}
 
       Gracias por confiar en Taller Interestellar.
 

@@ -163,7 +163,7 @@ const testEmailTemplate = () => {
           </div>
           
           <div class="message">
-            Si recibís este mensaje, la configuración SMTP está funcionando perfectamente.
+            Si recibís este mensaje, la configuración de Brevo está funcionando perfectamente.
           </div>
           
           <div class="test-card">
@@ -177,8 +177,8 @@ const testEmailTemplate = () => {
               <span class="detail-value">Operativo</span>
             </div>
             <div class="detail-item">
-              <span class="detail-label">Configuración SMTP:</span>
-              <span class="detail-value">Exitosa</span>
+              <span class="detail-label">Proveedor de Email:</span>
+              <span class="detail-value">Brevo (Sendinblue)</span>
             </div>
           </div>
         </div>

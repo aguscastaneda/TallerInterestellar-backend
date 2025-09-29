@@ -1,6 +1,7 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
 const { PrismaClient } = require('@prisma/client');
+const licensePlateValidator = require('../utils/licensePlateValidator');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -191,7 +192,14 @@ router.get('/:id', async (req, res) => {
 // POST /api/cars - Crear nuevo auto
 router.post('/', [
   body('clientId').isInt({ min: 1 }),
-  body('licensePlate').notEmpty().trim(),
+  body('licensePlate').notEmpty().trim().custom((value) => {
+    try {
+      licensePlateValidator(value);
+      return true;
+    } catch (error) {
+      throw new Error(error.message);
+    }
+  }),
   body('brand').notEmpty().trim(),
   body('model').notEmpty().trim(),
   body('kms').optional().isInt({ min: 0 }),
@@ -205,7 +213,7 @@ router.post('/', [
   try {
     const {
       clientId,
-      licensePlate,
+      licensePlate: rawLicensePlate,
       brand,
       model,
       kms,
@@ -215,6 +223,9 @@ router.post('/', [
       priority = 1,
       estimatedDate
     } = req.body;
+    
+    // Normalize and validate license plate
+    const licensePlate = licensePlateValidator(rawLicensePlate);
 
     // Verificar si el cliente existe
     const client = await prisma.client.findUnique({
@@ -228,7 +239,7 @@ router.post('/', [
       });
     }
 
-    // Verificar si la patente ya existe
+    // Verificar si la patente ya existe (using normalized license plate)
     const existingCar = await prisma.car.findUnique({
       where: { licensePlate }
     });
@@ -291,7 +302,14 @@ router.post('/', [
 
 // PUT /api/cars/:id - Actualizar auto
 router.put('/:id', [
-  body('licensePlate').optional().trim(),
+  body('licensePlate').optional().trim().custom((value) => {
+    try {
+      licensePlateValidator(value);
+      return true;
+    } catch (error) {
+      throw new Error(error.message);
+    }
+  }),
   body('brand').optional().trim(),
   body('model').optional().trim(),
   body('kms').optional().isInt({ min: 0 }),
@@ -306,6 +324,11 @@ router.put('/:id', [
   try {
     const { id } = req.params;
     const updateData = req.body;
+    
+    // Normalize and validate license plate if provided
+    if (updateData.licensePlate) {
+      updateData.licensePlate = licensePlateValidator(updateData.licensePlate);
+    }
 
     // Verificar si el auto existe
     const existingCar = await prisma.car.findUnique({

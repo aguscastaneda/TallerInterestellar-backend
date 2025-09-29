@@ -115,11 +115,10 @@ router.get('/status', (req, res) => {
     success: true,
     data: {
       configured: emailService.isConfigured,
-      host: process.env.SMTP_HOST || 'Not configured',
-      port: process.env.SMTP_PORT || 'Not configured',
-      user: process.env.SMTP_USER || 'Not configured',
-      fromName: process.env.SMTP_FROM_NAME || 'Taller Interestellar',
-      fromEmail: process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || 'Not configured'
+      provider: 'Brevo (Sendinblue)',
+      apiKey: process.env.BREVO_API_KEY ? 'Configured' : 'Not configured',
+      senderEmail: process.env.BREVO_SENDER_EMAIL || 'Not configured',
+      senderName: process.env.BREVO_SENDER_NAME || 'Not configured'
     }
   });
 });
