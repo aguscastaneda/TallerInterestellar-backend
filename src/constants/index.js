@@ -39,7 +39,7 @@ const PAYMENT_METHODS = {
   TRANSFERENCIA: 'TRANSFERENCIA'
 };
 
-// Mapeo de estados para traducción
+
 const STATUS_TRANSLATIONS = {
   [SERVICE_REQUEST_STATUS.PENDING]: 'Pendiente',
   [SERVICE_REQUEST_STATUS.ASSIGNED]: 'Asignada',
@@ -50,7 +50,7 @@ const STATUS_TRANSLATIONS = {
   [SERVICE_REQUEST_STATUS.CANCELLED]: 'Cancelada'
 };
 
-// Colores para estados de autos
+
 const CAR_STATUS_COLORS = {
   [CAR_STATUS.ENTRADA]: 'bg-gray-100 text-gray-800',
   [CAR_STATUS.PENDIENTE]: 'bg-yellow-100 text-yellow-800',
@@ -62,7 +62,7 @@ const CAR_STATUS_COLORS = {
   [CAR_STATUS.CANCELADO]: 'bg-orange-100 text-orange-800'
 };
 
-// Colores para tabs de estados
+
 const CAR_STATUS_TAB_COLORS = {
   [CAR_STATUS.ENTRADA]: 'bg-gray-500 hover:bg-gray-600',
   [CAR_STATUS.PENDIENTE]: 'bg-yellow-500 hover:bg-yellow-600',
@@ -74,7 +74,7 @@ const CAR_STATUS_TAB_COLORS = {
   [CAR_STATUS.CANCELADO]: 'bg-orange-500 hover:bg-orange-600'
 };
 
-// Nombres de estados para emails
+
 const CAR_STATUS_NAMES = {
   [CAR_STATUS.ENTRADA]: 'Entrada',
   [CAR_STATUS.PENDIENTE]: 'Pendiente',

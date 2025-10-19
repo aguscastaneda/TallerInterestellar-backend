@@ -1,8 +1,7 @@
-// Login confirmation email template
 const { designTokens } = require('../config/designTokens');
 
 const loginConfirmationTemplate = (userName, userEmail, loginDateTime) => {
-  // Map design tokens to template structure
+
   const colors = {
     primary: {
       main: designTokens.colors.red[500],
@@ -16,7 +15,7 @@ const loginConfirmationTemplate = (userName, userEmail, loginDateTime) => {
       primary: designTokens.colors.white
     }
   };
-  
+
   return `
     <!DOCTYPE html>
     <html>

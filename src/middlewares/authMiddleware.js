@@ -13,12 +13,10 @@ export const authenticateToken = async (req, res, next) => {
       });
     }
 
-    // Verificar token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
-    // Buscar usuario en la base de datos
+
     const user = await User.findByPk(decoded.userId);
-    
+
     if (!user || !user.activo) {
       return res.status(401).json({
         success: false,
@@ -26,7 +24,6 @@ export const authenticateToken = async (req, res, next) => {
       });
     }
 
-    // Agregar usuario al request
     req.user = user;
     next();
   } catch (error) {
@@ -36,7 +33,7 @@ export const authenticateToken = async (req, res, next) => {
         message: 'Token inválido'
       });
     }
-    
+
     if (error.name === 'TokenExpiredError') {
       return res.status(401).json({
         success: false,

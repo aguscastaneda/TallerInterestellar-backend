@@ -10,7 +10,6 @@ const budgetTemplate = (carData, budgetData, clientName) => {
     minute: '2-digit'
   });
 
-  // Define colors using design tokens
   const colors = {
     primary: {
       main: designTokens.colors.red[500],

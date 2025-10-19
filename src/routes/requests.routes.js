@@ -15,7 +15,6 @@ const handleValidationErrors = (req, res, next) => {
   next();
 };
 
-// POST /api/requests - Cliente crea solicitud de mecánico
 router.post('/', [
   body('carId').isInt({ min: 1 }),
   body('clientId').isInt({ min: 1 }),
@@ -26,7 +25,6 @@ router.post('/', [
   try {
     const { carId, clientId, description, preferredMechanicId } = req.body;
 
-    // Validaciones básicas
     const car = await prisma.car.findUnique({ where: { id: carId } });
     if (!car || car.clientId !== clientId) {
       return res.status(400).json({ success: false, message: 'Auto inválido para el cliente' });
@@ -38,7 +36,6 @@ router.post('/', [
       if (!mech) return res.status(400).json({ success: false, message: 'Mecánico preferido no encontrado' });
       assignedBossId = mech.bossId || null;
     } else {
-      // Elegir jefe aleatorio
       const bosses = await prisma.boss.findMany();
       if (bosses.length === 0) return res.status(400).json({ success: false, message: 'No hay jefes disponibles' });
       assignedBossId = bosses[Math.floor(Math.random() * bosses.length)].id;
@@ -61,9 +58,8 @@ router.post('/', [
       }
     });
 
-    // Actualizar estado del auto a "pendiente"
-    const updatedCar = await prisma.car.update({ 
-      where: { id: carId }, 
+    const updatedCar = await prisma.car.update({
+      where: { id: carId },
       data: { statusId: CAR_STATUS.PENDIENTE },
       include: {
         status: true,
@@ -75,7 +71,6 @@ router.post('/', [
       }
     });
 
-    // Send email notification
     try {
       await emailService.sendCarStateChangeNotification(updatedCar);
     } catch (emailError) {
@@ -89,7 +84,6 @@ router.post('/', [
   }
 });
 
-// GET /api/requests/boss/:bossId - Solicitudes asignadas a un jefe
 router.get('/boss/:bossId', async (req, res) => {
   try {
     const { bossId } = req.params;
@@ -104,7 +98,6 @@ router.get('/boss/:bossId', async (req, res) => {
       orderBy: { createdAt: 'desc' }
     });
 
-    // Para las solicitudes completadas, buscar información de reparación
     const requestsWithRepairs = await Promise.all(
       requests.map(async (request) => {
         if (request.status === SERVICE_REQUEST_STATUS.COMPLETED) {
@@ -128,7 +121,6 @@ router.get('/boss/:bossId', async (req, res) => {
   }
 });
 
-// PUT /api/requests/:id/assign - Jefe asigna mecánico
 router.put('/:id/assign', [
   body('mechanicId').isInt({ min: 1 }),
   handleValidationErrors
@@ -153,9 +145,8 @@ router.put('/:id/assign', [
       }
     });
 
-    // Cambiar estado del auto a "en revision"
-    const updatedCarForRevision = await prisma.car.update({ 
-      where: { id: updated.carId }, 
+    const updatedCarForRevision = await prisma.car.update({
+      where: { id: updated.carId },
       data: { statusId: CAR_STATUS.EN_REVISION },
       include: {
         status: true,
@@ -172,7 +163,6 @@ router.put('/:id/assign', [
       }
     });
 
-    // Send email notification
     try {
       await emailService.sendCarStateChangeNotification(updatedCarForRevision);
     } catch (emailError) {
@@ -185,7 +175,6 @@ router.put('/:id/assign', [
   }
 });
 
-// PUT /api/requests/:id/status - Actualizar estado (mecánico)
 router.put('/:id/status', [
   body('status').isIn([SERVICE_REQUEST_STATUS.IN_PROGRESS, SERVICE_REQUEST_STATUS.COMPLETED]),
   body('description').optional().trim(),
@@ -204,10 +193,9 @@ router.put('/:id/status', [
       data: { status },
     });
 
-    // Actualizar estado del auto según status de la solicitud
     if (status === SERVICE_REQUEST_STATUS.IN_PROGRESS) {
-      const updatedCarInProgress = await prisma.car.update({ 
-        where: { id: reqDb.carId }, 
+      const updatedCarInProgress = await prisma.car.update({
+        where: { id: reqDb.carId },
         data: { statusId: CAR_STATUS.EN_REPARACION },
         include: {
           status: true,
@@ -218,8 +206,7 @@ router.put('/:id/status', [
           }
         }
       });
-      
-      // Send email notification
+
       try {
         await emailService.sendCarStateChangeNotification(updatedCarInProgress);
       } catch (emailError) {
@@ -227,7 +214,6 @@ router.put('/:id/status', [
       }
     }
 
-    // Si completado, crear Repair y actualizar Car.statusId
     let repair = null;
     if (status === SERVICE_REQUEST_STATUS.COMPLETED && reqDb.assignedMechanicId) {
       repair = await prisma.repair.create({
@@ -239,8 +225,8 @@ router.put('/:id/status', [
           warranty: 90
         }
       });
-      const finalizedCar = await prisma.car.update({ 
-        where: { id: reqDb.carId }, 
+      const finalizedCar = await prisma.car.update({
+        where: { id: reqDb.carId },
         data: { statusId: CAR_STATUS.FINALIZADO },
         include: {
           status: true,
@@ -256,8 +242,7 @@ router.put('/:id/status', [
           }
         }
       });
-      
-      // Send email notification
+
       try {
         await emailService.sendCarStateChangeNotification(finalizedCar);
       } catch (emailError) {
@@ -272,7 +257,6 @@ router.put('/:id/status', [
   }
 });
 
-// POST /api/requests/:id/budget - Create and send budget (mechanic)
 router.post('/:id/budget', [
   body('description').notEmpty().trim(),
   body('cost').isFloat({ min: 0 }),
@@ -282,42 +266,41 @@ router.post('/:id/budget', [
     const { id } = req.params;
     const { description, cost } = req.body;
 
-    // Get the service request with all necessary data
     const request = await prisma.serviceRequest.findUnique({
       where: { id: parseInt(id) },
       include: {
-        car: { 
-          include: { 
+        car: {
+          include: {
             status: true,
             client: {
               include: {
                 user: true
               }
             }
-          } 
+          }
         },
-        client: { 
-          include: { 
-            user: { 
-              select: { 
-                id: true, 
-                name: true, 
+        client: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
                 lastName: true,
                 email: true
-              } 
-            } 
-          } 
+              }
+            }
+          }
         },
-        assignedMechanic: { 
-          include: { 
-            user: { 
-              select: { 
-                id: true, 
-                name: true, 
-                lastName: true 
-              } 
-            } 
-          } 
+        assignedMechanic: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                lastName: true
+              }
+            }
+          }
         }
       }
     });
@@ -326,13 +309,11 @@ router.post('/:id/budget', [
       return res.status(404).json({ success: false, message: 'Solicitud no encontrada' });
     }
 
-    // Update request status to PRESUPUESTO_ENVIADO
     const updatedRequest = await prisma.serviceRequest.update({
       where: { id: parseInt(id) },
       data: { status: SERVICE_REQUEST_STATUS.PRESUPUESTO_ENVIADO }
     });
 
-    // Update car status to PENDIENTE (waiting for client response)
     const updatedCar = await prisma.car.update({
       where: { id: request.carId },
       data: { statusId: CAR_STATUS.PENDIENTE },
@@ -346,7 +327,6 @@ router.post('/:id/budget', [
       }
     });
 
-    // Send budget email to client
     const budgetData = {
       description,
       cost: parseFloat(cost)
@@ -356,13 +336,12 @@ router.post('/:id/budget', [
       await emailService.sendBudgetEmail(updatedCar, budgetData);
     } catch (emailError) {
       console.error('Error sending budget email:', emailError);
-      // Don't fail the request if email fails
     }
 
-    res.json({ 
-      success: true, 
-      message: 'Presupuesto enviado al cliente', 
-      data: { request: updatedRequest, car: updatedCar } 
+    res.json({
+      success: true,
+      message: 'Presupuesto enviado al cliente',
+      data: { request: updatedRequest, car: updatedCar }
     });
   } catch (error) {
     console.error('Error al enviar presupuesto:', error);
@@ -370,36 +349,34 @@ router.post('/:id/budget', [
   }
 });
 
-// POST /api/requests/:id/cancel - Cancelar solicitud (cliente)
 router.post('/:id/cancel', async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Get the service request with all necessary data
     const request = await prisma.serviceRequest.findUnique({
       where: { id: parseInt(id) },
       include: {
-        car: { 
-          include: { 
+        car: {
+          include: {
             status: true,
             client: {
               include: {
                 user: true
               }
             }
-          } 
+          }
         },
-        client: { 
-          include: { 
-            user: { 
-              select: { 
-                id: true, 
-                name: true, 
+        client: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
                 lastName: true,
                 email: true
-              } 
-            } 
-          } 
+              }
+            }
+          }
         }
       }
     });
@@ -408,13 +385,11 @@ router.post('/:id/cancel', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Solicitud no encontrada' });
     }
 
-    // Update request status to CANCELLED
     const updatedRequest = await prisma.serviceRequest.update({
       where: { id: parseInt(id) },
       data: { status: SERVICE_REQUEST_STATUS.CANCELLED }
     });
 
-    // Update car status to CANCELADO y entonces a ENTRADA
     await prisma.car.update({
       where: { id: request.carId },
       data: { statusId: CAR_STATUS.CANCELADO }
@@ -433,18 +408,16 @@ router.post('/:id/cancel', async (req, res) => {
       }
     });
 
-    // Send email notification
     try {
       await emailService.sendCarStateChangeNotification(updatedCar);
     } catch (emailError) {
       console.error('Error sending cancellation email:', emailError);
-      // Don't fail the request if email fails
     }
 
-    res.json({ 
-      success: true, 
-      message: 'Solicitud cancelada exitosamente', 
-      data: { request: updatedRequest, car: updatedCar } 
+    res.json({
+      success: true,
+      message: 'Solicitud cancelada exitosamente',
+      data: { request: updatedRequest, car: updatedCar }
     });
   } catch (error) {
     console.error('Error al cancelar solicitud:', error);
@@ -452,7 +425,6 @@ router.post('/:id/cancel', async (req, res) => {
   }
 });
 
-// GET /api/requests/mechanic/:mechanicId - Solicitudes por mecánico asignado
 router.get('/mechanic/:mechanicId', async (req, res) => {
   try {
     const { mechanicId } = req.params;
@@ -465,15 +437,12 @@ router.get('/mechanic/:mechanicId', async (req, res) => {
       orderBy: { createdAt: 'desc' }
     });
 
-    // Para las solicitudes completadas, buscar información de reparación
-    // Todos los mecánicos pueden ver los detalles de cualquier reparación completada
     const requestsWithRepairs = await Promise.all(
       requests.map(async (request) => {
         if (request.status === SERVICE_REQUEST_STATUS.COMPLETED) {
           const repair = await prisma.repair.findFirst({
             where: {
               carId: request.carId
-              // Remover filtro por mechanicId para que todos los mecánicos vean los detalles
             },
             orderBy: { createdAt: 'desc' }
           });
@@ -490,7 +459,6 @@ router.get('/mechanic/:mechanicId', async (req, res) => {
   }
 });
 
-// GET /api/requests/client/:clientId - Historial de solicitudes por cliente
 router.get('/client/:clientId', async (req, res) => {
   try {
     const { clientId } = req.params;

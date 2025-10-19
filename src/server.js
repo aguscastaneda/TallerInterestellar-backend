@@ -3,7 +3,6 @@ const cors = require('cors');
 require('dotenv').config();
 const { PrismaClient } = require('@prisma/client');
 
-// Importar rutas
 const authRoutes = require('./routes/auth.routes');
 const carsRoutes = require('./routes/cars.routes');
 const repairsRoutes = require('./routes/repairs.routes');
@@ -19,11 +18,9 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 const prisma = new PrismaClient();
 
-// Middlewares
 app.use(cors());
 app.use(express.json());
 
-// Ruta de prueba
 app.get('/api/health', (req, res) => {
   res.json({
     success: true,
@@ -33,7 +30,6 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Rutas de la API
 app.use('/api/auth', authRoutes);
 app.use('/api/cars', carsRoutes);
 app.use('/api/repairs', repairsRoutes);
@@ -45,7 +41,6 @@ app.use('/api/client-repairs', clientRepairsRoutes);
 app.use('/api/config', configRoutes);
 app.use('/api/email', emailRoutes);
 
-// Middleware para rutas no encontradas
 app.use('*', (req, res) => {
   res.status(404).json({
     success: false,
@@ -53,14 +48,11 @@ app.use('*', (req, res) => {
   });
 });
 
-// Función para iniciar el servidor
 const startServer = async () => {
   try {
-    // Verificar conexión a la base de datos
     await prisma.$connect();
     console.log('Conectado a la base de datos');
 
-    // Iniciar servidor
     app.listen(PORT, () => {
       console.log(`Servidor corriendo en puerto ${PORT}`);
     });
@@ -71,7 +63,6 @@ const startServer = async () => {
   }
 };
 
-// Manejo de señales de terminación
 process.on('SIGTERM', async () => {
   console.log('Señal SIGTERM recibida. Cerrando servidor...');
   await prisma.$disconnect();
@@ -79,10 +70,9 @@ process.on('SIGTERM', async () => {
 });
 
 process.on('SIGINT', async () => {
-  console.log('🛑 Señal SIGINT recibida. Cerrando servidor...');
+  console.log('Señal SIGINT recibida. Cerrando servidor...');
   await prisma.$disconnect();
   process.exit(0);
 });
 
-// Iniciar servidor
 startServer();

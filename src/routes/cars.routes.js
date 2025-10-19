@@ -6,7 +6,6 @@ const licensePlateValidator = require('../utils/licensePlateValidator');
 const router = express.Router();
 const prisma = new PrismaClient();
 
-// Middleware para validar errores de validación
 const handleValidationErrors = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -19,7 +18,6 @@ const handleValidationErrors = (req, res, next) => {
   next();
 };
 
-// GET /api/cars - Obtener todos los autos
 router.get('/', async (req, res) => {
   try {
     const cars = await prisma.car.findMany({
@@ -56,7 +54,7 @@ router.get('/', async (req, res) => {
         createdAt: 'desc'
       }
     });
-    
+
     res.json({
       success: true,
       data: cars
@@ -70,7 +68,6 @@ router.get('/', async (req, res) => {
   }
 });
 
-// GET /api/cars/plate/:licensePlate - Buscar por patente exacta
 router.get('/plate/:licensePlate', async (req, res) => {
   try {
     const { licensePlate } = req.params;
@@ -94,7 +91,6 @@ router.get('/plate/:licensePlate', async (req, res) => {
   }
 });
 
-// GET /api/cars/client/:clientId - Autos por cliente
 router.get('/client/:clientId', async (req, res) => {
   try {
     const { clientId } = req.params;
@@ -113,11 +109,10 @@ router.get('/client/:clientId', async (req, res) => {
   }
 });
 
-// GET /api/cars/:id - Obtener auto por ID
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     const car = await prisma.car.findUnique({
       where: { id: parseInt(id) },
       include: {
@@ -189,10 +184,9 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// POST /api/cars - Crear nuevo auto
 router.post('/', [
-  body('clientId').isInt({ min: 1 }),
-  body('licensePlate').notEmpty().trim().custom((value) => {
+  body('clientId').isInt({ min: 1 }).withMessage('El ID del cliente es obligatorio'),
+  body('licensePlate').notEmpty().trim().withMessage('La patente es obligatoria').custom((value) => {
     try {
       licensePlateValidator(value);
       return true;
@@ -200,14 +194,17 @@ router.post('/', [
       throw new Error(error.message);
     }
   }),
-  body('brand').notEmpty().trim(),
-  body('model').notEmpty().trim(),
-  body('kms').optional().isInt({ min: 0 }),
-  body('chassis').optional().trim(),
-  body('description').optional().trim(),
+  body('brand').notEmpty().trim().withMessage('La marca es obligatoria'),
+  body('model').notEmpty().trim().withMessage('El modelo es obligatorio'),
+  body('year').isInt({ min: 1900, max: new Date().getFullYear() + 1 }).withMessage('El año es obligatorio y debe ser válido'),
+  body('kms').isInt({ min: 0 }).withMessage('Los kilómetros son obligatorios'),
+  body('chassis').isLength({ min: 17, max: 17 }).withMessage('El chasis debe tener exactamente 17 caracteres').trim().custom((value) => {
+    if (!value || value.length !== 17) {
+      throw new Error('El chasis debe tener exactamente 17 caracteres');
+    }
+    return true;
+  }),
   body('statusId').optional().isInt({ min: 0 }),
-  body('priority').optional().isInt({ min: 1, max: 5 }),
-  body('estimatedDate').optional().isISO8601(),
   handleValidationErrors
 ], async (req, res) => {
   try {
@@ -216,18 +213,15 @@ router.post('/', [
       licensePlate: rawLicensePlate,
       brand,
       model,
+      year,
       kms,
       chassis,
-      description,
-      statusId = 1,
-      priority = 1,
-      estimatedDate
+      statusId = 1
     } = req.body;
-    
-    // Normalize and validate license plate
-    const licensePlate = licensePlateValidator(rawLicensePlate);
 
-    // Verificar si el cliente existe
+    const licensePlate = licensePlateValidator(rawLicensePlate);
+    const capitalizedChassis = chassis.toUpperCase();
+
     const client = await prisma.client.findUnique({
       where: { id: clientId }
     });
@@ -239,7 +233,6 @@ router.post('/', [
       });
     }
 
-    // Verificar si la patente ya existe (using normalized license plate)
     const existingCar = await prisma.car.findUnique({
       where: { licensePlate }
     });
@@ -251,19 +244,16 @@ router.post('/', [
       });
     }
 
-    // Crear el auto
     const car = await prisma.car.create({
       data: {
         clientId,
         licensePlate,
         brand,
         model,
+        year,
         kms,
-        chassis,
-        description,
-        statusId,
-        priority,
-        estimatedDate: estimatedDate ? new Date(estimatedDate) : null
+        chassis: capitalizedChassis,
+        statusId
       },
       include: {
         client: {
@@ -300,7 +290,6 @@ router.post('/', [
   }
 });
 
-// PUT /api/cars/:id - Actualizar auto
 router.put('/:id', [
   body('licensePlate').optional().trim().custom((value) => {
     try {
@@ -312,25 +301,30 @@ router.put('/:id', [
   }),
   body('brand').optional().trim(),
   body('model').optional().trim(),
+  body('year').optional().isInt({ min: 1900, max: new Date().getFullYear() + 1 }).withMessage('El año debe ser válido'),
   body('kms').optional().isInt({ min: 0 }),
-  body('chassis').optional().trim(),
-  body('description').optional().trim(),
+  body('chassis').optional().isLength({ min: 17, max: 17 }).withMessage('El chasis debe tener exactamente 17 caracteres').trim().custom((value) => {
+    if (value && value.length !== 17) {
+      throw new Error('El chasis debe tener exactamente 17 caracteres');
+    }
+    return true;
+  }),
   body('statusId').optional().isInt({ min: 0 }),
-  body('priority').optional().isInt({ min: 1, max: 5 }),
-  body('estimatedDate').optional().isISO8601(),
   body('mechanicId').optional().isInt({ min: 1 }),
   handleValidationErrors
 ], async (req, res) => {
   try {
     const { id } = req.params;
     const updateData = req.body;
-    
-    // Normalize and validate license plate if provided
+
     if (updateData.licensePlate) {
       updateData.licensePlate = licensePlateValidator(updateData.licensePlate);
     }
 
-    // Verificar si el auto existe
+    if (updateData.chassis) {
+      updateData.chassis = updateData.chassis.toUpperCase();
+    }
+
     const existingCar = await prisma.car.findUnique({
       where: { id: parseInt(id) }
     });
@@ -342,7 +336,6 @@ router.put('/:id', [
       });
     }
 
-    // Si se está cambiando la patente, verificar que no exista
     if (updateData.licensePlate && updateData.licensePlate !== existingCar.licensePlate) {
       const carWithSamePlate = await prisma.car.findUnique({
         where: { licensePlate: updateData.licensePlate }
@@ -356,7 +349,6 @@ router.put('/:id', [
       }
     }
 
-    // Si se está asignando un mecánico, verificar que exista
     if (updateData.mechanicId) {
       const mechanic = await prisma.mechanic.findUnique({
         where: { id: updateData.mechanicId }
@@ -370,12 +362,7 @@ router.put('/:id', [
       }
     }
 
-    // Convertir fecha si se proporciona
-    if (updateData.estimatedDate) {
-      updateData.estimatedDate = new Date(updateData.estimatedDate);
-    }
 
-    // Actualizar el auto
     const updatedCar = await prisma.car.update({
       where: { id: parseInt(id) },
       data: updateData,
@@ -425,12 +412,10 @@ router.put('/:id', [
   }
 });
 
-// DELETE /api/cars/:id - Eliminar auto
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Verificar si el auto existe
     const existingCar = await prisma.car.findUnique({
       where: { id: parseInt(id) }
     });
@@ -442,7 +427,6 @@ router.delete('/:id', async (req, res) => {
       });
     }
 
-    // Verificar si tiene reparaciones asociadas
     const repairs = await prisma.repair.findMany({
       where: { carId: parseInt(id) }
     });
@@ -454,7 +438,6 @@ router.delete('/:id', async (req, res) => {
       });
     }
 
-    // Eliminar el auto
     await prisma.car.delete({
       where: { id: parseInt(id) }
     });
@@ -473,11 +456,10 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-// GET /api/cars/status/:statusId - Obtener autos por estado
 router.get('/status/:statusId', async (req, res) => {
   try {
     const { statusId } = req.params;
-    
+
     const cars = await prisma.car.findMany({
       where: { statusId: parseInt(statusId) },
       include: {
@@ -514,7 +496,7 @@ router.get('/status/:statusId', async (req, res) => {
         createdAt: 'desc'
       }
     });
-    
+
     res.json({
       success: true,
       data: cars

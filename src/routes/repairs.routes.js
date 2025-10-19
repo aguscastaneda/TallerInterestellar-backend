@@ -7,7 +7,7 @@ const emailService = require('../services/emailService');
 const router = express.Router();
 const prisma = new PrismaClient();
 
-// Middleware para validar errores de validación
+
 const handleValidationErrors = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -20,7 +20,7 @@ const handleValidationErrors = (req, res, next) => {
   next();
 };
 
-// GET /api/repairs - Obtener todas las reparaciones
+
 router.get('/', async (req, res) => {
   try {
     const repairs = await prisma.repair.findMany({
@@ -61,7 +61,7 @@ router.get('/', async (req, res) => {
         createdAt: 'desc'
       }
     });
-    
+
     res.json({
       success: true,
       data: repairs
@@ -75,11 +75,11 @@ router.get('/', async (req, res) => {
   }
 });
 
-// GET /api/repairs/:id - Obtener reparación por ID
+
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     const repair = await prisma.repair.findUnique({
       where: { id: parseInt(id) },
       include: {
@@ -155,7 +155,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// POST /api/repairs - Crear nueva reparación
+
 router.post('/', [
   body('carId').isInt({ min: 1 }),
   body('mechanicId').isInt({ min: 1 }),
@@ -173,7 +173,7 @@ router.post('/', [
       warranty = 90
     } = req.body;
 
-    // Verificar si el auto existe
+
     const car = await prisma.car.findUnique({
       where: { id: carId }
     });
@@ -185,7 +185,7 @@ router.post('/', [
       });
     }
 
-    // Verificar si el mecánico existe
+
     const mechanic = await prisma.mechanic.findUnique({
       where: { id: mechanicId }
     });
@@ -197,7 +197,7 @@ router.post('/', [
       });
     }
 
-    // Crear la reparación
+
     const repair = await prisma.repair.create({
       data: {
         carId,
@@ -239,7 +239,7 @@ router.post('/', [
       }
     });
 
-    // Actualizar el estado del auto a "En Reparación" (asumiendo que el ID 2 es "En Reparación")
+
     const updatedCar = await prisma.car.update({
       where: { id: carId },
       data: { statusId: CAR_STATUS.EN_REPARACION },
@@ -258,7 +258,7 @@ router.post('/', [
       }
     });
 
-    // Send email notification
+
     try {
       await emailService.sendCarStateChangeNotification(updatedCar);
     } catch (emailError) {
@@ -280,7 +280,7 @@ router.post('/', [
   }
 });
 
-// PUT /api/repairs/:id - Actualizar reparación
+
 router.put('/:id', [
   body('description').optional().trim(),
   body('cost').optional().isFloat({ min: 0 }),
@@ -291,7 +291,7 @@ router.put('/:id', [
     const { id } = req.params;
     const updateData = req.body;
 
-    // Verificar si la reparación existe
+
     const existingRepair = await prisma.repair.findUnique({
       where: { id: parseInt(id) }
     });
@@ -303,12 +303,12 @@ router.put('/:id', [
       });
     }
 
-    // Convertir costo si se proporciona
+
     if (updateData.cost) {
       updateData.cost = parseFloat(updateData.cost);
     }
 
-    // Actualizar la reparación
+
     const updatedRepair = await prisma.repair.update({
       where: { id: parseInt(id) },
       data: updateData,
@@ -360,12 +360,12 @@ router.put('/:id', [
   }
 });
 
-// DELETE /api/repairs/:id - Eliminar reparación
+
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Verificar si la reparación existe
+
     const existingRepair = await prisma.repair.findUnique({
       where: { id: parseInt(id) }
     });
@@ -377,7 +377,7 @@ router.delete('/:id', async (req, res) => {
       });
     }
 
-    // Verificar si tiene pagos asociados
+
     const payments = await prisma.payment.findMany({
       where: { repairId: parseInt(id) }
     });
@@ -389,7 +389,7 @@ router.delete('/:id', async (req, res) => {
       });
     }
 
-    // Eliminar la reparación
+
     await prisma.repair.delete({
       where: { id: parseInt(id) }
     });
@@ -408,11 +408,11 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-// GET /api/repairs/car/:carId - Obtener reparaciones por auto
+
 router.get('/car/:carId', async (req, res) => {
   try {
     const { carId } = req.params;
-    
+
     const repairs = await prisma.repair.findMany({
       where: { carId: parseInt(carId) },
       include: {
@@ -432,7 +432,7 @@ router.get('/car/:carId', async (req, res) => {
         createdAt: 'desc'
       }
     });
-    
+
     res.json({
       success: true,
       data: repairs
@@ -446,11 +446,11 @@ router.get('/car/:carId', async (req, res) => {
   }
 });
 
-// GET /api/repairs/mechanic/:mechanicId - Obtener reparaciones por mecánico
+
 router.get('/mechanic/:mechanicId', async (req, res) => {
   try {
     const { mechanicId } = req.params;
-    
+
     const repairs = await prisma.repair.findMany({
       where: { mechanicId: parseInt(mechanicId) },
       include: {
@@ -477,7 +477,7 @@ router.get('/mechanic/:mechanicId', async (req, res) => {
         createdAt: 'desc'
       }
     });
-    
+
     res.json({
       success: true,
       data: repairs

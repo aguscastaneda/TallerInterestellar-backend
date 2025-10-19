@@ -1,63 +1,58 @@
-// Design tokens for email templates - extracted from frontend design system
 const designTokens = {
   colors: {
-    // Primary red colors
+ 
     red: {
       50: '#ffebee',
       100: '#ffcdd2',
       200: '#ef9a9a',
       300: '#e57373',
       400: '#ef5350',
-      500: '#D32F2F', // Primary red
+      500: '#D32F2F', 
       600: '#e53935',
       700: '#d32f2f',
       800: '#c62828',
       900: '#b71c1c'
     },
     
-    // Green colors
     green: {
       50: '#e8f5e8',
       100: '#c8e6c9',
       200: '#a5d6a7',
       300: '#81c784',
       400: '#66bb6a',
-      500: '#4CAF50', // Primary green
+      500: '#4CAF50',
       600: '#43a047',
       700: '#388e3c',
       800: '#2e7d32',
       900: '#1b5e20'
     },
     
-    // Yellow colors
     yellow: {
       50: '#fffde7',
       100: '#fff9c4',
       200: '#fff59d',
       300: '#fff176',
       400: '#ffee58',
-      500: '#FFC107', // Primary yellow
+      500: '#FFC107',
       600: '#fdd835',
       700: '#fbc02d',
       800: '#f9a825',
       900: '#f57f17'
     },
     
-    // Orange colors
     orange: {
       50: '#fff3e0',
       100: '#ffe0b2',
       200: '#ffcc80',
       300: '#ffb74d',
       400: '#ffa726',
-      500: '#FF5722', // Primary orange
+      500: '#FF5722',
       600: '#fb8c00',
       700: '#f57c00',
       800: '#ef6c00',
       900: '#e65100'
     },
     
-    // Black/Gray colors
     black: {
       50: '#f8f8f8',
       100: '#f0f0f0',
@@ -71,7 +66,6 @@ const designTokens = {
       900: '#1C1C1C'
     },
     
-    // Metallic grays
     metallic: {
       50: '#f8f9fa',
       100: '#f1f3f4',

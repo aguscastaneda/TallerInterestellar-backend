@@ -1,42 +1,39 @@
-// Base email template with shared styles and structure
 const { designTokens } = require('../config/designTokens');
 
-const baseEmailTemplate = (content, theme = 'primary') => {
-  // Theme configurations using design tokens
-  const themes = {
-    primary: {
-      gradient: `linear-gradient(135deg, ${designTokens.colors.red[500]} 0%, ${designTokens.colors.red[800]} 100%)`,
-      highlight: designTokens.colors.red[500],
-      cardBg: `linear-gradient(135deg, ${designTokens.colors.red[50]} 0%, ${designTokens.colors.red[100]} 100%)`,
-      cardBorder: designTokens.colors.red[300],
-      divider: `linear-gradient(90deg, ${designTokens.colors.red[500]}, ${designTokens.colors.red[800]}, ${designTokens.colors.red[500]})`
-    },
-    success: {
-      gradient: `linear-gradient(135deg, ${designTokens.colors.green[500]} 0%, ${designTokens.colors.green[700]} 100%)`,
-      highlight: designTokens.colors.green[500],
-      cardBg: `linear-gradient(135deg, ${designTokens.colors.green[50]} 0%, ${designTokens.colors.green[100]} 100%)`,
-      cardBorder: designTokens.colors.green[300],
-      divider: `linear-gradient(90deg, ${designTokens.colors.green[500]}, ${designTokens.colors.green[700]}, ${designTokens.colors.green[500]})`
-    },
-    warning: {
-      gradient: `linear-gradient(135deg, ${designTokens.colors.yellow[500]} 0%, ${designTokens.colors.yellow[700]} 100%)`,
-      highlight: designTokens.colors.yellow[500],
-      cardBg: `linear-gradient(135deg, ${designTokens.colors.yellow[50]} 0%, ${designTokens.colors.yellow[100]} 100%)`,
-      cardBorder: designTokens.colors.yellow[300],
-      divider: `linear-gradient(90deg, ${designTokens.colors.yellow[500]}, ${designTokens.colors.yellow[700]}, ${designTokens.colors.yellow[500]})`
-    },
-    danger: {
-      gradient: `linear-gradient(135deg, ${designTokens.colors.orange[500]} 0%, ${designTokens.colors.orange[700]} 100%)`,
-      highlight: designTokens.colors.orange[500],
-      cardBg: `linear-gradient(135deg, ${designTokens.colors.orange[50]} 0%, ${designTokens.colors.orange[100]} 100%)`,
-      cardBorder: designTokens.colors.orange[300],
-      divider: `linear-gradient(90deg, ${designTokens.colors.orange[500]}, ${designTokens.colors.orange[700]}, ${designTokens.colors.orange[500]})`
-    }
-  };
+const themes = {
+  primary: {
+    gradient: `linear-gradient(135deg, ${designTokens.colors.red[500]} 0%, ${designTokens.colors.red[800]} 100%)`,
+    highlight: designTokens.colors.red[500],
+    cardBg: `linear-gradient(135deg, ${designTokens.colors.red[50]} 0%, ${designTokens.colors.red[100]} 100%)`,
+    cardBorder: designTokens.colors.red[300],
+    divider: `linear-gradient(90deg, ${designTokens.colors.red[500]}, ${designTokens.colors.red[800]}, ${designTokens.colors.red[500]})`
+  },
+  success: {
+    gradient: `linear-gradient(135deg, ${designTokens.colors.green[500]} 0%, ${designTokens.colors.green[700]} 100%)`,
+    highlight: designTokens.colors.green[500],
+    cardBg: `linear-gradient(135deg, ${designTokens.colors.green[50]} 0%, ${designTokens.colors.green[100]} 100%)`,
+    cardBorder: designTokens.colors.green[300],
+    divider: `linear-gradient(90deg, ${designTokens.colors.green[500]}, ${designTokens.colors.green[700]}, ${designTokens.colors.green[500]})`
+  },
+  warning: {
+    gradient: `linear-gradient(135deg, ${designTokens.colors.yellow[500]} 0%, ${designTokens.colors.yellow[700]} 100%)`,
+    highlight: designTokens.colors.yellow[500],
+    cardBg: `linear-gradient(135deg, ${designTokens.colors.yellow[50]} 0%, ${designTokens.colors.yellow[100]} 100%)`,
+    cardBorder: designTokens.colors.yellow[300],
+    divider: `linear-gradient(90deg, ${designTokens.colors.yellow[500]}, ${designTokens.colors.yellow[700]}, ${designTokens.colors.yellow[500]})`
+  },
+  danger: {
+    gradient: `linear-gradient(135deg, ${designTokens.colors.orange[500]} 0%, ${designTokens.colors.orange[700]} 100%)`,
+    highlight: designTokens.colors.orange[500],
+    cardBg: `linear-gradient(135deg, ${designTokens.colors.orange[50]} 0%, ${designTokens.colors.orange[100]} 100%)`,
+    cardBorder: designTokens.colors.orange[300],
+    divider: `linear-gradient(90deg, ${designTokens.colors.orange[500]}, ${designTokens.colors.orange[700]}, ${designTokens.colors.orange[500]})`
+  }
+};
 
-  const currentTheme = themes[theme] || themes.primary;
+const currentTheme = themes[theme] || themes.primary;
 
-  return `
+return `
     <!DOCTYPE html>
     <html>
     <head>
@@ -215,6 +212,6 @@ const baseEmailTemplate = (content, theme = 'primary') => {
     </body>
     </html>
   `;
-};
+;
 
 module.exports = { baseEmailTemplate };

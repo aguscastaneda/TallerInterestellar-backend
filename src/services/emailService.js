@@ -1,6 +1,5 @@
 const SibApiV3Sdk = require('sib-api-v3-sdk');
 
-// Import email templates
 const { loginConfirmationTemplate } = require('../templates/loginConfirmationTemplate');
 const { welcomeEmailTemplate } = require('../templates/welcomeEmailTemplate');
 const { passwordResetTemplate } = require('../templates/passwordResetTemplate');
@@ -8,7 +7,6 @@ const { testEmailTemplate } = require('../templates/testEmailTemplate');
 const { carStateChangeTemplate } = require('../templates/carStateChangeTemplate');
 const { budgetTemplate } = require('../templates/budgetTemplate');
 
-// Email Service Configuration
 class EmailService {
   constructor() {
     this.isConfigured = false;
@@ -19,14 +17,12 @@ class EmailService {
 
   init() {
     try {
-      // Configure Brevo API
       let defaultClient = SibApiV3Sdk.ApiClient.instance;
       let apiKey = defaultClient.authentications['api-key'];
       apiKey.apiKey = process.env.BREVO_API_KEY;
-      
+
       this.apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
-      
-      // Set sender information
+
       this.sender = {
         email: process.env.BREVO_SENDER_EMAIL || "info@tallerinterestellar.com.ar",
         name: process.env.BREVO_SENDER_NAME || "Taller Interestellar"
@@ -42,7 +38,6 @@ class EmailService {
     }
   }
 
-  // Generic email sending method
   async sendEmail({ to, subject, html, text }) {
     if (!this.isConfigured) {
       console.warn('Email service not configured, skipping email send');
@@ -50,7 +45,6 @@ class EmailService {
     }
 
     try {
-      // Format recipients
       let recipients;
       if (Array.isArray(to)) {
         recipients = to.map(email => {
@@ -70,34 +64,33 @@ class EmailService {
         to: recipients,
         subject: subject,
         htmlContent: html,
-       textContent: text
+        textContent: text
       };
 
       console.log('Sending email to:', recipients.map(r => r.email).join(', '));
       const data = await this.apiInstance.sendTransacEmail(sendSmtpEmail);
-      
+
       console.log('Email sent successfully:', data.messageId);
-      return { 
-        success: true, 
+      return {
+        success: true,
         messageId: data.messageId,
-        message: 'Email sent successfully' 
+        message: 'Email sent successfully'
       };
 
     } catch (error) {
       console.error('Error sending email:', error);
-      return { 
-        success: false, 
+      return {
+        success: false,
         error: error.message,
-        message: 'Failed to send email' 
+        message: 'Failed to send email'
       };
     }
   }
 
-  // Registration confirmation email
   async sendRegistrationConfirmation(userEmail, userName, loginDateTime) {
     const subject = 'Registro de sesión confirmado en Taller Interestellar';
     const html = loginConfirmationTemplate(userName, userEmail, loginDateTime);
-    
+
     const textVersion = `
       Hola ${userName},
 
@@ -120,11 +113,10 @@ class EmailService {
     });
   }
 
-  // Welcome email for new users
   async sendWelcomeEmail(userEmail, userName, userRole) {
     const subject = 'Bienvenido a Taller Interestellar';
     const html = welcomeEmailTemplate(userName);
-    
+
     return await this.sendEmail({
       to: userEmail,
       subject,
@@ -133,11 +125,10 @@ class EmailService {
     });
   }
 
-  // Password reset email
   async sendPasswordResetEmail(userEmail, userName, resetToken) {
     const subject = 'Restablecé tu contraseña en Taller Interestellar';
     const html = passwordResetTemplate(userName, resetToken);
-    
+
     const textVersion = `
       Hola ${userName},
 
@@ -159,11 +150,10 @@ class EmailService {
     });
   }
 
-  // Test email method
   async sendTestEmail(to) {
     const subject = 'Prueba de Email - Taller Interestellar';
     const html = testEmailTemplate();
-    
+
     return await this.sendEmail({
       to,
       subject,
@@ -172,7 +162,6 @@ class EmailService {
     });
   }
 
-  // Car state change notification email
   async sendCarStateChangeNotification(carData, previousState = null) {
     if (!carData || !carData.client || !carData.client.user || !carData.client.user.email) {
       console.warn('Incomplete car data for email notification');
@@ -182,10 +171,10 @@ class EmailService {
     const userEmail = carData.client.user.email;
     const userName = `${carData.client.user.name} ${carData.client.user.lastName}`;
     const currentStateName = carData.status ? carData.status.name : 'Actualizado';
-    
+
     const subject = `Estado de su vehículo actualizado: ${currentStateName} - ${carData.licensePlate}`;
     const html = carStateChangeTemplate(carData, previousState);
-    
+
     const textVersion = `
       Hola ${userName},
 
@@ -193,13 +182,13 @@ class EmailService {
 
       Estado actual: ${currentStateName}
       Fecha y hora: ${new Date().toLocaleString('es-AR', {
-        timeZone: 'America/Argentina/Buenos_Aires',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      })}
+      timeZone: 'America/Argentina/Buenos_Aires',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })}
 
       Para más detalles, acceda a nuestro sistema en línea.
 
@@ -216,7 +205,6 @@ class EmailService {
     });
   }
 
-  // Budget email for clients
   async sendBudgetEmail(carData, budgetData) {
     if (!carData || !carData.client || !carData.client.user || !carData.client.user.email) {
       console.warn('Incomplete car data for budget email');
@@ -225,10 +213,10 @@ class EmailService {
 
     const userEmail = carData.client.user.email;
     const userName = `${carData.client.user.name} ${carData.client.user.lastName}`;
-    
+
     const subject = `Presupuesto para su vehículo ${carData.licensePlate} - Taller Interestellar`;
     const html = budgetTemplate(carData, budgetData, userName);
-    
+
     const textVersion = `
       Hola ${userName},
 
@@ -257,6 +245,5 @@ class EmailService {
   }
 }
 
-// Create and export singleton instance
 const emailService = new EmailService();
 module.exports = emailService;

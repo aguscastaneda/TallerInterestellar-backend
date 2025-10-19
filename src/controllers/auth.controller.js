@@ -2,7 +2,7 @@ import jwt from 'jsonwebtoken';
 import { User } from '../models/index.js';
 import { validationResult } from 'express-validator';
 
-// Generar token JWT
+
 const generateToken = (userId) => {
   return jwt.sign(
     { userId },
@@ -11,10 +11,10 @@ const generateToken = (userId) => {
   );
 };
 
-// Login de usuario
+
 export const login = async (req, res) => {
   try {
-    // Validar campos requeridos
+
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({
@@ -26,7 +26,7 @@ export const login = async (req, res) => {
 
     const { email, password } = req.body;
 
-    // Buscar usuario por email
+
     const user = await User.findOne({ where: { email } });
     
     if (!user) {
@@ -36,7 +36,7 @@ export const login = async (req, res) => {
       });
     }
 
-    // Verificar si el usuario está activo
+
     if (!user.activo) {
       return res.status(401).json({
         success: false,
@@ -44,7 +44,7 @@ export const login = async (req, res) => {
       });
     }
 
-    // Verificar contraseña
+
     const isPasswordValid = await user.comparePassword(password);
     if (!isPasswordValid) {
       return res.status(401).json({
@@ -53,13 +53,13 @@ export const login = async (req, res) => {
       });
     }
 
-    // Actualizar último acceso
+
     await user.update({ ultimoAcceso: new Date() });
 
-    // Generar token
+
     const token = generateToken(user.id);
 
-    // Enviar respuesta
+
     res.json({
       success: true,
       message: 'Login exitoso',
@@ -79,10 +79,10 @@ export const login = async (req, res) => {
   }
 };
 
-// Registro de cliente
+
 export const register = async (req, res) => {
   try {
-    // Validar campos requeridos
+
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({
@@ -94,7 +94,7 @@ export const register = async (req, res) => {
 
     const { nombre, apellido, email, cuil, telefono, password } = req.body;
 
-    // Verificar si el email ya existe
+
     const existingUser = await User.findOne({ where: { email } });
     if (existingUser) {
       return res.status(400).json({
@@ -103,7 +103,7 @@ export const register = async (req, res) => {
       });
     }
 
-    // Verificar si el CUIL ya existe
+
     const existingCUIL = await User.findOne({ where: { cuil } });
     if (existingCUIL) {
       return res.status(400).json({
@@ -112,7 +112,7 @@ export const register = async (req, res) => {
       });
     }
 
-    // Crear nuevo usuario (solo clientes pueden registrarse)
+
     const newUser = await User.create({
       nombre,
       apellido,
@@ -124,10 +124,10 @@ export const register = async (req, res) => {
       activo: true
     });
 
-    // Generar token
+
     const token = generateToken(newUser.id);
 
-    // Enviar respuesta
+
     res.status(201).json({
       success: true,
       message: 'Cliente registrado exitosamente',
@@ -141,7 +141,7 @@ export const register = async (req, res) => {
   } catch (error) {
     console.error('Error en registro:', error);
     
-    // Manejar errores de validación de Sequelize
+
     if (error.name === 'SequelizeValidationError') {
       return res.status(400).json({
         success: false,
@@ -167,7 +167,7 @@ export const register = async (req, res) => {
   }
 };
 
-// Obtener perfil del usuario autenticado
+
 export const getProfile = async (req, res) => {
   try {
     const user = req.user;
@@ -187,7 +187,7 @@ export const getProfile = async (req, res) => {
   }
 };
 
-// Cambiar contraseña
+
 export const changePassword = async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -202,7 +202,7 @@ export const changePassword = async (req, res) => {
     const { currentPassword, newPassword } = req.body;
     const user = req.user;
 
-    // Verificar contraseña actual
+
     const isCurrentPasswordValid = await user.comparePassword(currentPassword);
     if (!isCurrentPasswordValid) {
       return res.status(400).json({
@@ -211,7 +211,7 @@ export const changePassword = async (req, res) => {
       });
     }
 
-    // Actualizar contraseña
+
     await user.update({ password: newPassword });
 
     res.json({
@@ -227,12 +227,10 @@ export const changePassword = async (req, res) => {
     });
   }
 };
-
-// Logout (opcional, ya que JWT es stateless)
+ 
 export const logout = async (req, res) => {
   try {
-    // En un sistema real, podrías agregar el token a una blacklist
-    // Por ahora, solo enviamos una respuesta de éxito
+
     res.json({
       success: true,
       message: 'Logout exitoso'

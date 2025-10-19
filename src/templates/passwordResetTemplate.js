@@ -1,10 +1,8 @@
-// Password reset email template
 const { designTokens } = require('../config/designTokens');
 
 const passwordResetTemplate = (userName, resetToken) => {
   const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${resetToken}`;
-  
-  // Map design tokens to template structure
+
   const colors = {
     primary: {
       main: designTokens.colors.red[500],
@@ -18,7 +16,7 @@ const passwordResetTemplate = (userName, resetToken) => {
       primary: designTokens.colors.white
     }
   };
-  
+
   return `
     <!DOCTYPE html>
     <html>

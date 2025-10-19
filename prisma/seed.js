@@ -4,10 +4,9 @@ const bcrypt = require('bcryptjs');
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🌱 Iniciando seed de la base de datos...');
+  console.log('Iniciando seed de la base de datos...');
 
-  // Crear roles
-  console.log('📝 Creando roles...');
+  console.log('Creando roles...');
   const roles = await Promise.all([
     prisma.role.upsert({
       where: { id: 1 },
@@ -35,12 +34,10 @@ async function main() {
       create: { id: 5, name: 'Recepcionista' }
     })
   ]);
-  console.log('✅ Roles creados:', roles.map(r => r.name));
+  console.log('Roles creados:', roles.map(r => r.name));
 
-  // Crear estados de auto
-  console.log('🚗 Creando estados de auto...');
+  console.log('Creando estados de auto...');
   
-  // Actualizar estados existentes y crear nuevos
   const carStatuses = await Promise.all([
     prisma.carStatus.upsert({
       where: { id: 1 },
@@ -83,10 +80,9 @@ async function main() {
       create: { id: 8, name: 'Cancelado' }
     })
   ]);
-  console.log('✅ Estados de auto creados:', carStatuses.map(s => s.name));
+  console.log('Estados de auto creados:', carStatuses.map(s => s.name));
 
-  // Crear usuario admin
-  console.log('👑 Creando usuario admin...');
+  console.log('Creando usuario admin...');
   const adminPassword = await bcrypt.hash('admin123', 12);
   const adminUser = await prisma.user.upsert({
     where: { email: 'admin@taller.com' },
@@ -110,10 +106,9 @@ async function main() {
       userId: adminUser.id
     }
   });
-  console.log('✅ Admin creado:', adminUser.email);
+  console.log('Admin creado:', adminUser.email);
 
-  // Crear usuario jefe de mecánicos
-  console.log('👨‍💼 Creando usuario jefe de mecánicos...');
+  console.log('Creando usuario jefe de mecánicos...');
   const bossPassword = await bcrypt.hash('jefe123', 12);
   const bossUser = await prisma.user.upsert({
     where: { email: 'jefe@taller.com' },
@@ -137,10 +132,9 @@ async function main() {
       userId: bossUser.id
     }
   });
-  console.log('✅ Jefe creado:', bossUser.email);
+  console.log('Jefe creado:', bossUser.email);
 
-  // Crear usuarios mecánicos
-  console.log('🔧 Creando usuarios mecánicos...');
+  console.log('Creando usuarios mecánicos...');
   const mechanicPassword = await bcrypt.hash('mecanico123', 12);
   
   const mechanic1User = await prisma.user.upsert({
@@ -190,10 +184,9 @@ async function main() {
       bossId: boss.id
     }
   });
-  console.log('✅ Mecánicos creados:', [mechanic1User.email, mechanic2User.email]);
+  console.log('Mecánicos creados:', [mechanic1User.email, mechanic2User.email]);
 
-  // Crear usuarios clientes
-  console.log('👤 Creando usuarios clientes...');
+  console.log('Creando usuarios clientes...');
   const clientPassword = await bcrypt.hash('cliente123', 12);
   
   const client1User = await prisma.user.upsert({
@@ -241,10 +234,10 @@ async function main() {
       userId: client2User.id
     }
   });
-  console.log('✅ Clientes creados:', [client1User.email, client2User.email]);
+  console.log('Clientes creados:', [client1User.email, client2User.email]);
 
-  // Crear usuario recepcionista
-  console.log('📋 Creando usuario recepcionista...');
+
+  console.log('Creando usuario recepcionista...');
   const recepcionistaPassword = await bcrypt.hash('recepcionista123', 12);
   const recepcionistaUser = await prisma.user.upsert({
     where: { email: 'recepcionista@taller.com' },
@@ -268,10 +261,9 @@ async function main() {
       userId: recepcionistaUser.id
     }
   });
-  console.log('✅ Recepcionista creado:', recepcionistaUser.email);
+  console.log('Recepcionista creado:', recepcionistaUser.email);
 
-  // Crear autos
-  console.log('🚗 Creando autos...');
+  console.log('Creando autos...');
   const car1 = await prisma.car.upsert({
     where: { licensePlate: 'ABC123' },
     update: {},
@@ -304,10 +296,9 @@ async function main() {
       mechanicId: mechanic1.id
     }
   });
-  console.log('✅ Autos creados:', [car1.licensePlate, car2.licensePlate]);
+  console.log('Autos creados:', [car1.licensePlate, car2.licensePlate]);
 
-  // Crear reparaciones
-  console.log('🔧 Creando reparaciones...');
+  console.log('Creando reparaciones...');
   const repair1 = await prisma.repair.create({
     data: {
       carId: car2.id,
@@ -317,10 +308,9 @@ async function main() {
       warranty: 90
     }
   });
-  console.log('✅ Reparación creada:', repair1.description);
+  console.log('Reparación creada:', repair1.description);
 
-  // Crear pagos
-  console.log('💰 Creando pagos...');
+  console.log('Creando pagos...');
   const payment1 = await prisma.payment.create({
     data: {
       repairId: repair1.id,
@@ -330,22 +320,22 @@ async function main() {
       status: 'PENDIENTE'
     }
   });
-  console.log('✅ Pago creado:', `$${payment1.amount}`);
+  console.log('Pago creado:', `$${payment1.amount}`);
 
-  console.log('\n🎉 ¡Seed completado exitosamente!');
-  console.log('\n🔑 Credenciales de prueba:');
-  console.log('👑 Admin: admin@taller.com / admin123');
-  console.log('👨‍💼 Jefe: jefe@taller.com / jefe123');
-  console.log('🔧 Mecánico 1: mecanico1@taller.com / mecanico123');
-  console.log('🔧 Mecánico 2: mecanico2@taller.com / mecanico123');
-  console.log('👤 Cliente 1: cliente1@email.com / cliente123');
-  console.log('👤 Cliente 2: cliente2@email.com / cliente123');
-  console.log('📋 Recepcionista: recepcionista@taller.com / recepcionista123');
+  console.log('\n¡Seed completado exitosamente!');
+  console.log('\nCredenciales de prueba:');
+  console.log('Admin: admin@taller.com / admin123');
+  console.log('Jefe: jefe@taller.com / jefe123');
+  console.log('Mecánico 1: mecanico1@taller.com / mecanico123');
+  console.log('Mecánico 2: mecanico2@taller.com / mecanico123');
+  console.log('Cliente 1: cliente1@email.com / cliente123');
+  console.log('Cliente 2: cliente2@email.com / cliente123');
+  console.log('Recepcionista: recepcionista@taller.com / recepcionista123');
 }
 
 main()
   .catch((e) => {
-    console.error('❌ Error durante el seed:', e);
+      console.error('Error durante el seed:', e);
     process.exit(1);
   })
   .finally(async () => {

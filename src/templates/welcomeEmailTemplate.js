@@ -1,8 +1,6 @@
-// Welcome email template
 const { designTokens } = require('../config/designTokens');
 
 const welcomeEmailTemplate = (userName) => {
-  // Map design tokens to template structure
   const colors = {
     primary: {
       main: designTokens.colors.red[500],
@@ -16,7 +14,7 @@ const welcomeEmailTemplate = (userName) => {
       primary: designTokens.colors.white
     }
   };
-  
+
   return `
     <!DOCTYPE html>
     <html>

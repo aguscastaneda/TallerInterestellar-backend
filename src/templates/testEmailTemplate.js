@@ -1,8 +1,6 @@
-// Test email template
 const { designTokens } = require('../config/designTokens');
 
 const testEmailTemplate = () => {
-  // Map design tokens to template structure
   const colors = {
     primary: {
       main: designTokens.colors.red[500],
@@ -16,7 +14,7 @@ const testEmailTemplate = () => {
       primary: designTokens.colors.white
     }
   };
-  
+
   return `
     <!DOCTYPE html>
     <html>

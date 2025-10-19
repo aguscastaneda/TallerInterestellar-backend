@@ -1,7 +1,6 @@
 const { designTokens } = require('../config/designTokens');
 const { CAR_STATUS } = require('../constants');
 
-// Estado colors mapping for emails (using design tokens)
 const STATE_COLORS = {
   [CAR_STATUS.ENTRADA]: { bg: '#f9fafb', color: '#374151', cardBg: '#f3f4f6', cardBorder: '#d1d5db' },
   [CAR_STATUS.PENDIENTE]: { bg: '#fef3c7', color: '#92400e', cardBg: '#fffbeb', cardBorder: '#fde68a' },
@@ -13,7 +12,6 @@ const STATE_COLORS = {
   [CAR_STATUS.CANCELADO]: { bg: '#fed7aa', color: '#ea580c', cardBg: '#fff7ed', cardBorder: '#fdba74' }
 };
 
-// Estado names mapping
 const STATE_NAMES = {
   [CAR_STATUS.ENTRADA]: 'Entrada',
   [CAR_STATUS.PENDIENTE]: 'Pendiente',
@@ -52,7 +50,6 @@ const carStateChangeTemplate = (carData, previousState = null) => {
     minute: '2-digit'
   });
 
-  // Map design tokens to template structure
   const colors = {
     primary: {
       main: designTokens.colors.red[500],
@@ -67,7 +64,6 @@ const carStateChangeTemplate = (carData, previousState = null) => {
     }
   };
 
-  // Build mechanic info if available
   let mechanicInfo = '';
   if (carData.mechanic && currentState.id === CAR_STATUS.EN_REVISION) {
     mechanicInfo = `
@@ -81,7 +77,6 @@ const carStateChangeTemplate = (carData, previousState = null) => {
     `;
   }
 
-  // Build previous state info if available
   let previousStateInfo = '';
   if (previousState) {
     previousStateInfo = `

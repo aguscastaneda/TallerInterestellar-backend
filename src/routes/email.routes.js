@@ -6,7 +6,6 @@ const emailService = require('../services/emailService');
 const router = express.Router();
 const prisma = new PrismaClient();
 
-// Validation middleware
 const handleValidationErrors = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -19,18 +18,17 @@ const handleValidationErrors = (req, res, next) => {
   next();
 };
 
-// POST /api/email/test - Send test email
 router.post('/test', [
   body('email').isEmail().withMessage('Valid email is required'),
   handleValidationErrors
 ], async (req, res) => {
   try {
     const { email } = req.body;
-    
-    console.log('🧪 Sending test email to:', email);
-    
+
+    console.log('Sending test email to:', email);
+
     const result = await emailService.sendTestEmail(email);
-    
+
     if (result.success) {
       res.json({
         success: true,
@@ -47,9 +45,9 @@ router.post('/test', [
         error: result.error
       });
     }
-    
+
   } catch (error) {
-    console.error('❌ Error in test email route:', error);
+    console.error('Error in test email route:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -58,7 +56,6 @@ router.post('/test', [
   }
 });
 
-// POST /api/email/registration-confirmation - Send registration confirmation
 router.post('/registration-confirmation', [
   body('email').isEmail().withMessage('Valid email is required'),
   body('name').notEmpty().withMessage('Name is required'),
@@ -66,7 +63,7 @@ router.post('/registration-confirmation', [
 ], async (req, res) => {
   try {
     const { email, name } = req.body;
-    
+
     const loginDateTime = new Date().toLocaleString('es-AR', {
       timeZone: 'America/Argentina/Buenos_Aires',
       year: 'numeric',
@@ -76,11 +73,11 @@ router.post('/registration-confirmation', [
       minute: '2-digit',
       second: '2-digit'
     });
-    
-    console.log('📧 Sending registration confirmation to:', email);
-    
+
+    console.log('Sending registration confirmation to:', email);
+
     const result = await emailService.sendRegistrationConfirmation(email, name, loginDateTime);
-    
+
     if (result.success) {
       res.json({
         success: true,
@@ -98,9 +95,9 @@ router.post('/registration-confirmation', [
         error: result.error
       });
     }
-    
+
   } catch (error) {
-    console.error('❌ Error in registration confirmation email route:', error);
+    console.error('Error in registration confirmation email route:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -109,7 +106,6 @@ router.post('/registration-confirmation', [
   }
 });
 
-// GET /api/email/status - Get email service status
 router.get('/status', (req, res) => {
   res.json({
     success: true,
@@ -123,7 +119,6 @@ router.get('/status', (req, res) => {
   });
 });
 
-// Test car state change email route
 router.post('/test-car-state-change', async (req, res) => {
   try {
     const { carId, testEmail } = req.body;
@@ -135,7 +130,6 @@ router.post('/test-car-state-change', async (req, res) => {
       });
     }
 
-    // Get car data with all necessary relations
     const car = await prisma.car.findUnique({
       where: { id: parseInt(carId) },
       include: {
@@ -160,7 +154,6 @@ router.post('/test-car-state-change', async (req, res) => {
       });
     }
 
-    // Create a test car object with the provided email or car's email
     const testCar = {
       ...car,
       client: {
@@ -172,9 +165,8 @@ router.post('/test-car-state-change', async (req, res) => {
       }
     };
 
-    // Send test email notification
     const result = await emailService.sendCarStateChangeNotification(testCar);
-    
+
     res.json({
       success: true,
       message: 'Email de prueba enviado',

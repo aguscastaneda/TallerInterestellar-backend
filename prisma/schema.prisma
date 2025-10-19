@@ -125,13 +125,11 @@ model Car {
   licensePlate String     @unique @db.VarChar(20)
   brand        String     @db.VarChar(50)
   model        String     @db.VarChar(50)
-  kms          Int?
-  chassis      String?    @db.VarChar(50)
-  description  String?    @db.Text
+  year         Int        @db.SmallInt
+  kms          Int
+  chassis      String     @db.VarChar(17)
   statusId     Int        @default(1) @db.TinyInt
   status       CarStatus  @relation(fields: [statusId], references: [id])
-  priority     Int        @default(1)
-  estimatedDate DateTime?
   repairs      Repair[]
   serviceRequests ServiceRequest[]
   createdAt    DateTime   @default(now())

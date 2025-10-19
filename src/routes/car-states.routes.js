@@ -6,7 +6,6 @@ const emailService = require('../services/emailService');
 const router = express.Router();
 const prisma = new PrismaClient();
 
-// POST /api/car-states/transition - Cambiar estado de un auto
 router.post('/transition', async (req, res) => {
   try {
     const { carId, newStatusId, description } = req.body;
@@ -18,7 +17,6 @@ router.post('/transition', async (req, res) => {
       });
     }
 
-    // Verificar que el auto existe
     const car = await prisma.car.findUnique({
       where: { id: parseInt(carId) },
       include: {
@@ -38,7 +36,6 @@ router.post('/transition', async (req, res) => {
       });
     }
 
-    // Verificar que el nuevo estado existe
     const newStatus = await prisma.carStatus.findUnique({
       where: { id: parseInt(newStatusId) }
     });
@@ -50,10 +47,9 @@ router.post('/transition', async (req, res) => {
       });
     }
 
-    // Actualizar el estado del auto
     const updatedCar = await prisma.car.update({
       where: { id: parseInt(carId) },
-      data: { 
+      data: {
         statusId: parseInt(newStatusId),
         description: description || car.description
       },
@@ -72,12 +68,10 @@ router.post('/transition', async (req, res) => {
       }
     });
 
-    // Send email notification
     try {
       await emailService.sendCarStateChangeNotification(updatedCar, car.status);
     } catch (emailError) {
       console.error('Error sending state change email:', emailError);
-      // Don't fail the request if email fails
     }
 
     res.json({
@@ -95,7 +89,6 @@ router.post('/transition', async (req, res) => {
   }
 });
 
-// GET /api/car-states/statuses - Obtener todos los estados disponibles
 router.get('/statuses', async (req, res) => {
   try {
     const statuses = await prisma.carStatus.findMany({
@@ -115,7 +108,6 @@ router.get('/statuses', async (req, res) => {
   }
 });
 
-// POST /api/car-states/accept-budget - Aceptar presupuesto (cliente)
 router.post('/accept-budget', async (req, res) => {
   try {
     const { carId } = req.body;
@@ -127,9 +119,8 @@ router.post('/accept-budget', async (req, res) => {
       });
     }
 
-    // Find the service request associated with this car that has PRESUPUESTO_ENVIADO status and is assigned to a mechanic
     const serviceRequest = await prisma.serviceRequest.findFirst({
-      where: { 
+      where: {
         carId: parseInt(carId),
         status: SERVICE_REQUEST_STATUS.PRESUPUESTO_ENVIADO,
         assignedMechanicId: {
@@ -137,15 +128,15 @@ router.post('/accept-budget', async (req, res) => {
         }
       },
       include: {
-        car: { 
-          include: { 
+        car: {
+          include: {
             status: true,
             client: {
               include: {
                 user: true
               }
             }
-          } 
+          }
         }
       }
     });
@@ -157,13 +148,11 @@ router.post('/accept-budget', async (req, res) => {
       });
     }
 
-    // Update the service request status to IN_REPAIR
     const updatedServiceRequest = await prisma.serviceRequest.update({
       where: { id: serviceRequest.id },
       data: { status: SERVICE_REQUEST_STATUS.IN_REPAIR }
     });
 
-    // Cambiar estado a "En reparacion"
     const updatedCar = await prisma.car.update({
       where: { id: parseInt(carId) },
       data: { statusId: CAR_STATUS.EN_REPARACION },
@@ -177,7 +166,6 @@ router.post('/accept-budget', async (req, res) => {
       }
     });
 
-    // Send email notification
     try {
       await emailService.sendCarStateChangeNotification(updatedCar);
     } catch (emailError) {
@@ -199,7 +187,6 @@ router.post('/accept-budget', async (req, res) => {
   }
 });
 
-// POST /api/car-states/reject-budget - Rechazar presupuesto (cliente)
 router.post('/reject-budget', async (req, res) => {
   try {
     const { carId } = req.body;
@@ -211,9 +198,8 @@ router.post('/reject-budget', async (req, res) => {
       });
     }
 
-    // Find the service request associated with this car that has PRESUPUESTO_ENVIADO status and is assigned to a mechanic
     const serviceRequest = await prisma.serviceRequest.findFirst({
-      where: { 
+      where: {
         carId: parseInt(carId),
         status: SERVICE_REQUEST_STATUS.PRESUPUESTO_ENVIADO,
         assignedMechanicId: {
@@ -229,13 +215,11 @@ router.post('/reject-budget', async (req, res) => {
       });
     }
 
-    // Mark it as rejected
     await prisma.serviceRequest.update({
       where: { id: serviceRequest.id },
       data: { status: SERVICE_REQUEST_STATUS.REJECTED }
     });
 
-    // Cambiar estado a "Rechazado" y luego a "Entrada"
     await prisma.car.update({
       where: { id: parseInt(carId) },
       data: { statusId: CAR_STATUS.RECHAZADO }
@@ -254,7 +238,6 @@ router.post('/reject-budget', async (req, res) => {
       }
     });
 
-    // Send email notification
     try {
       await emailService.sendCarStateChangeNotification(updatedCar);
     } catch (emailError) {
@@ -276,7 +259,6 @@ router.post('/reject-budget', async (req, res) => {
   }
 });
 
-// POST /api/car-states/finish-repair - Finalizar reparación (mecánico)
 router.post('/finish-repair', async (req, res) => {
   try {
     const { carId, finalDescription, finalCost } = req.body;
@@ -288,18 +270,15 @@ router.post('/finish-repair', async (req, res) => {
       });
     }
 
-    // Crear registro de reparación
     const repair = await prisma.repair.create({
       data: {
         carId: parseInt(carId),
-        mechanicId: 1, // TODO: Obtener del token de autenticación
         description: finalDescription,
         cost: parseFloat(finalCost),
         warranty: 90
       }
     });
 
-    // Cambiar estado a "Finalizado"
     const updatedCar = await prisma.car.update({
       where: { id: parseInt(carId) },
       data: { statusId: CAR_STATUS.FINALIZADO },
@@ -314,7 +293,6 @@ router.post('/finish-repair', async (req, res) => {
       }
     });
 
-    // Send email notification
     try {
       await emailService.sendCarStateChangeNotification(updatedCar);
     } catch (emailError) {
@@ -336,7 +314,6 @@ router.post('/finish-repair', async (req, res) => {
   }
 });
 
-// POST /api/car-states/deliver-car - Entregar auto (recepcionista)
 router.post('/deliver-car', async (req, res) => {
   try {
     const { carId } = req.body;
@@ -348,7 +325,6 @@ router.post('/deliver-car', async (req, res) => {
       });
     }
 
-    // Cambiar estado a "Entregado" y luego a "Entrada"
     await prisma.car.update({
       where: { id: parseInt(carId) },
       data: { statusId: CAR_STATUS.ENTREGADO }
@@ -367,7 +343,6 @@ router.post('/deliver-car', async (req, res) => {
       }
     });
 
-    // Send email notification for delivery
     try {
       await emailService.sendCarStateChangeNotification(updatedCar);
     } catch (emailError) {

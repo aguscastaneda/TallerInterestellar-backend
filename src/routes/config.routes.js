@@ -5,41 +5,41 @@ const { ROLES, CAR_STATUS, SERVICE_REQUEST_STATUS, PAYMENT_STATUS, PAYMENT_METHO
 const router = express.Router();
 const prisma = new PrismaClient();
 
-// GET /api/config/system - Obtener toda la configuración del sistema
+
 router.get('/system', async (req, res) => {
   try {
-    // Obtener roles desde la base de datos
+
     const roles = await prisma.role.findMany({
       orderBy: { id: 'asc' }
     });
 
-    // Obtener estados de autos desde la base de datos
+
     const carStatuses = await prisma.carStatus.findMany({
       orderBy: { id: 'asc' }
     });
 
-    // Mapear estados con colores
+
     const carStatusesWithColors = carStatuses.map(status => ({
       ...status,
       color: CAR_STATUS_COLORS[status.id] || 'bg-gray-100 text-gray-800',
       tabColor: CAR_STATUS_TAB_COLORS[status.id] || 'bg-gray-500 hover:bg-gray-600'
     }));
 
-    // Configuración de estados de solicitudes
+
     const serviceRequestStatuses = Object.entries(SERVICE_REQUEST_STATUS).map(([key, value]) => ({
       key,
       value,
       label: STATUS_TRANSLATIONS[value] || value
     }));
 
-    // Configuración de estados de pagos
+
     const paymentStatuses = Object.entries(PAYMENT_STATUS).map(([key, value]) => ({
       key,
       value,
       label: value
     }));
 
-    // Configuración de métodos de pago
+
     const paymentMethods = Object.entries(PAYMENT_METHODS).map(([key, value]) => ({
       key,
       value,
@@ -73,7 +73,7 @@ router.get('/system', async (req, res) => {
   }
 });
 
-// GET /api/config/roles - Obtener solo los roles
+
 router.get('/roles', async (req, res) => {
   try {
     const roles = await prisma.role.findMany({
@@ -94,7 +94,7 @@ router.get('/roles', async (req, res) => {
   }
 });
 
-// GET /api/config/car-statuses - Obtener solo los estados de autos
+
 router.get('/car-statuses', async (req, res) => {
   try {
     const carStatuses = await prisma.carStatus.findMany({

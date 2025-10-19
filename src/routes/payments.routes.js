@@ -5,45 +5,45 @@ const { PrismaClient } = require('@prisma/client');
 const router = express.Router();
 const prisma = new PrismaClient();
 
-// MercadoPago Configuration
+
 let mercadoPago = null;
 let isConfigured = false;
 
 try {
   const { MercadoPagoConfig, Preference } = require('mercadopago');
-  
+
   if (!process.env.MP_KEY) {
     throw new Error('MP_KEY environment variable is required');
   }
-  
+
   const client = new MercadoPagoConfig({
     accessToken: process.env.MP_KEY,
     options: {
       timeout: 5000
     }
   });
-  
+
   mercadoPago = {
     preference: new Preference(client)
   };
-  
+
   isConfigured = true;
   console.log('MercadoPago SDK configured successfully');
-  
+
 } catch (error) {
   console.warn('MercadoPago SDK not available:', error.message);
   console.warn('Running in simulation mode for development');
   isConfigured = false;
 }
 
-// Environment Configuration
+
 const config = {
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
   backendUrl: process.env.BACKEND_URL || 'http://localhost:3001',
   isProduction: process.env.NODE_ENV === 'production'
 };
 
-// Validation Middleware
+
 const handleValidationErrors = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -56,7 +56,7 @@ const handleValidationErrors = (req, res, next) => {
   next();
 };
 
-// Utility Functions
+
 const formatPhoneNumber = (phone) => {
   if (!phone) return '11111111';
   return phone.replace(/[^0-9]/g, '').slice(-8).padStart(8, '1');
@@ -66,7 +66,7 @@ const generateFallbackEmail = (clientId) => {
   return `client${clientId}@taller-interestellar.com`;
 };
 
-// POST /api/payments/create-preference - Create MercadoPago preference
+
 router.post('/create-preference', [
   body('repairId').isInt({ min: 1 }).withMessage('Valid repair ID is required'),
   body('clientId').isInt({ min: 1 }).withMessage('Valid client ID is required'),
@@ -74,10 +74,10 @@ router.post('/create-preference', [
 ], async (req, res) => {
   try {
     const { repairId, clientId } = req.body;
-    
+
     console.log('Starting payment process:', { repairId, clientId });
 
-    // Fetch repair with complete data
+
     const repair = await prisma.repair.findUnique({
       where: { id: parseInt(repairId) },
       include: {
@@ -101,7 +101,7 @@ router.post('/create-preference', [
       }
     });
 
-    // Validation: Repair exists
+
     if (!repair) {
       return res.status(404).json({
         success: false,
@@ -109,7 +109,7 @@ router.post('/create-preference', [
       });
     }
 
-    // Validation: Client ownership
+
     if (repair.car.client.id !== parseInt(clientId)) {
       return res.status(403).json({
         success: false,
@@ -117,7 +117,7 @@ router.post('/create-preference', [
       });
     }
 
-    // Validation: Repair cost
+
     const repairCost = parseFloat(repair.cost);
     if (!repairCost || repairCost <= 0) {
       return res.status(400).json({
@@ -126,7 +126,7 @@ router.post('/create-preference', [
       });
     }
 
-    // Validation: No pending payments
+
     const existingPayment = await prisma.payment.findFirst({
       where: {
         repairId: parseInt(repairId),
@@ -141,7 +141,7 @@ router.post('/create-preference', [
       });
     }
 
-    // Validation: User data completeness
+
     const user = repair.car.client.user;
     if (!user.name || !user.lastName) {
       return res.status(400).json({
@@ -152,10 +152,10 @@ router.post('/create-preference', [
 
     console.log('Validation passed. Creating payment preference...');
 
-    // === SIMULATION MODE ===
+
     if (!isConfigured) {
       console.log('Using simulation mode');
-      
+
       const simulationPayment = await prisma.payment.create({
         data: {
           repairId: parseInt(repairId),
@@ -168,7 +168,7 @@ router.post('/create-preference', [
       });
 
       const simulationUrl = `${config.frontendUrl}/home/client/repairs?payment=success&simulation=true`;
-      
+
       return res.json({
         success: true,
         message: 'Simulation payment created (MercadoPago not available)',
@@ -182,9 +182,7 @@ router.post('/create-preference', [
       });
     }
 
-    // === MERCADOPAGO INTEGRATION ===
-    
-    // Prepare preference data
+
     const preferenceData = {
       items: [{
         id: `repair_${repair.id}`,
@@ -193,7 +191,7 @@ router.post('/create-preference', [
         quantity: 1,
         unit_price: repairCost
       }],
-      
+
       payer: {
         name: user.name,
         surname: user.lastName,
@@ -203,16 +201,16 @@ router.post('/create-preference', [
           number: formatPhoneNumber(user.phone)
         }
       },
-      
+
       back_urls: {
         success: `${config.frontendUrl}/home/client/repairs?payment=success`,
         failure: `${config.frontendUrl}/home/client/repairs?payment=failure`,
         pending: `${config.frontendUrl}/home/client/repairs?payment=pending`
       },
-      
+
       notification_url: `${config.backendUrl}/api/payments/webhook`,
       external_reference: `repair_${repair.id}_client_${clientId}`,
-      
+
       payment_methods: {
         excluded_payment_methods: [],
         excluded_payment_types: [],
@@ -222,14 +220,12 @@ router.post('/create-preference', [
 
     console.log('MercadoPago preference data:', JSON.stringify(preferenceData, null, 2));
 
-    // Create MercadoPago preference
     const mpPreference = await mercadoPago.preference.create({
       body: preferenceData
     });
 
     console.log('MercadoPago preference created:', mpPreference.id);
 
-    // Create payment record in database
     const payment = await prisma.payment.create({
       data: {
         repairId: parseInt(repairId),
@@ -254,8 +250,7 @@ router.post('/create-preference', [
 
   } catch (error) {
     console.error('Error creating payment preference:', error);
-    
-    // Handle specific MercadoPago errors
+
     if (error.status && error.message) {
       return res.status(400).json({
         success: false,
@@ -264,7 +259,7 @@ router.post('/create-preference', [
         mpError: true
       });
     }
-    
+
     res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -273,21 +268,19 @@ router.post('/create-preference', [
   }
 });
 
-// POST /api/payments/webhook - MercadoPago webhook
 router.post('/webhook', async (req, res) => {
   try {
     const { type, data } = req.body;
-    
+
     console.log('Webhook received:', { type, data });
-    
+
     if (type === 'payment') {
       const paymentId = data.id;
       console.log(`Payment notification received: ${paymentId}`);
-      
-      // Here you could update payment status based on MercadoPago response
-      // For now, we'll just acknowledge receipt
+
+
     }
-    
+
     res.status(200).send('OK');
   } catch (error) {
     console.error('Webhook error:', error);

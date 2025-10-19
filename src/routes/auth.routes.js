@@ -10,7 +10,6 @@ const emailService = require('../services/emailService');
 const router = express.Router();
 const prisma = new PrismaClient();
 
-// Middleware para validar errores de validación
 const handleValidationErrors = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -23,7 +22,6 @@ const handleValidationErrors = (req, res, next) => {
   next();
 };
 
-// POST /api/auth/register
 router.post('/register', [
   body('email').isEmail(),
   body('password').isLength({ min: 6 }),
@@ -37,7 +35,6 @@ router.post('/register', [
   try {
     const { email, password, name, lastName, phone, cuil, roleId } = req.body;
 
-    // Verificar si el usuario ya existe
     const existingUser = await prisma.user.findUnique({
       where: { email }
     });
@@ -49,10 +46,8 @@ router.post('/register', [
       });
     }
 
-    // Hash de la contraseña
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    // Crear usuario
     const user = await prisma.user.create({
       data: {
         email,
@@ -81,7 +76,6 @@ router.post('/register', [
       }
     });
 
-    // Crear perfil específico según el rol
     if (roleId === ROLES.CLIENT) {
       await prisma.client.create({
         data: { userId: user.id }
@@ -104,7 +98,6 @@ router.post('/register', [
       });
     }
 
-    // Generar token JWT
     const token = jwt.sign(
       {
         userId: user.id,
@@ -116,17 +109,15 @@ router.post('/register', [
       { expiresIn: '24h' }
     );
 
-    // Send welcome email
     try {
       await emailService.sendWelcomeEmail(
         user.email,
         `${user.name} ${user.lastName}`,
         user.role.name
       );
-      console.log('✅ Welcome email sent to:', user.email);
+      console.log('Welcome email sent to:', user.email);
     } catch (emailError) {
-      console.error('⚠️  Failed to send welcome email:', emailError.message);
-      // Don't fail registration if email fails
+      console.error('Failed to send welcome email:', emailError.message);
     }
 
     res.status(201).json({
@@ -147,7 +138,6 @@ router.post('/register', [
   }
 });
 
-// POST /api/auth/login
 router.post('/login', [
   body('email').isEmail(),
   body('password').notEmpty(),
@@ -156,7 +146,6 @@ router.post('/login', [
   try {
     const { email, password } = req.body;
 
-    // Buscar usuario
     const user = await prisma.user.findUnique({
       where: { email },
       include: {
@@ -176,7 +165,6 @@ router.post('/login', [
       });
     }
 
-    // Verificar contraseña
     const isValidPassword = await bcrypt.compare(password, user.password);
     if (!isValidPassword) {
       return res.status(401).json({
@@ -185,7 +173,6 @@ router.post('/login', [
       });
     }
 
-    // Generar token JWT
     const token = jwt.sign(
       {
         userId: user.id,
@@ -197,10 +184,8 @@ router.post('/login', [
       { expiresIn: '24h' }
     );
 
-    // Remover contraseña de la respuesta
     const { password: _, ...userWithoutPassword } = user;
 
-    // Send login confirmation email
     try {
       const loginDateTime = new Date().toLocaleString('es-AR', {
         timeZone: 'America/Argentina/Buenos_Aires',
@@ -211,16 +196,15 @@ router.post('/login', [
         minute: '2-digit',
         second: '2-digit'
       });
-      
+
       await emailService.sendRegistrationConfirmation(
         user.email,
         `${user.name} ${user.lastName}`,
         loginDateTime
       );
-      console.log('✅ Login confirmation email sent to:', user.email);
+      console.log('Login confirmation email sent to:', user.email);
     } catch (emailError) {
-      console.error('⚠️  Failed to send login confirmation email:', emailError.message);
-      // Don't fail login if email fails
+      console.error('Failed to send login confirmation email:', emailError.message);
     }
 
     res.json({
@@ -241,11 +225,10 @@ router.post('/login', [
   }
 });
 
-// GET /api/auth/me
 router.get('/me', async (req, res) => {
   try {
     const token = req.headers.authorization?.split(' ')[1];
-    
+
     if (!token) {
       return res.status(401).json({
         success: false,
@@ -254,7 +237,7 @@ router.get('/me', async (req, res) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
-    
+
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
       include: {
@@ -290,7 +273,6 @@ router.get('/me', async (req, res) => {
   }
 });
 
-// POST /api/auth/forgot-password
 router.post('/forgot-password', [
   body('email').isEmail(),
   handleValidationErrors
@@ -298,7 +280,6 @@ router.post('/forgot-password', [
   try {
     const { email } = req.body;
 
-    // Buscar usuario por email
     const user = await prisma.user.findUnique({
       where: { email },
       select: {
@@ -310,7 +291,6 @@ router.post('/forgot-password', [
       }
     });
 
-    // Por seguridad, siempre respondemos exitosamente incluso si el email no existe
     if (!user || !user.active) {
       return res.json({
         success: true,
@@ -318,11 +298,9 @@ router.post('/forgot-password', [
       });
     }
 
-    // Generar token de reset
     const resetToken = crypto.randomBytes(32).toString('hex');
     const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hora
 
-    // Guardar token en la base de datos
     try {
       await prisma.passwordReset.create({
         data: {
@@ -333,21 +311,17 @@ router.post('/forgot-password', [
       });
     } catch (dbError) {
       console.error('Database error when saving reset token:', dbError.message);
-      // Si la tabla no existe, continuamos sin guardar en DB
-      // El token se enviará por email de todas formas
     }
 
-    // Enviar email de reset
     try {
       await emailService.sendPasswordResetEmail(
         user.email,
         `${user.name} ${user.lastName}`,
         resetToken
       );
-      console.log('✅ Password reset email sent to:', user.email);
+      console.log('Password reset email sent to:', user.email);
     } catch (emailError) {
       console.error('⚠️  Failed to send password reset email:', emailError.message);
-      // No fallar la operación si el email falla
     }
 
     res.json({
@@ -364,7 +338,6 @@ router.post('/forgot-password', [
   }
 });
 
-// POST /api/auth/reset-password
 router.post('/reset-password', [
   body('token').notEmpty(),
   body('newPassword').isLength({ min: 6 }),
@@ -373,7 +346,6 @@ router.post('/reset-password', [
   try {
     const { token, newPassword } = req.body;
 
-    // Buscar token válido
     let passwordReset;
     try {
       passwordReset = await prisma.passwordReset.findFirst({
@@ -400,7 +372,6 @@ router.post('/reset-password', [
       });
     }
 
-    // Buscar usuario
     const user = await prisma.user.findUnique({
       where: { email: passwordReset.email }
     });
@@ -412,16 +383,13 @@ router.post('/reset-password', [
       });
     }
 
-    // Hash de la nueva contraseña
     const hashedPassword = await bcrypt.hash(newPassword, 12);
 
-    // Actualizar contraseña del usuario
     await prisma.user.update({
       where: { id: user.id },
       data: { password: hashedPassword }
     });
 
-    // Marcar token como usado
     try {
       await prisma.passwordReset.update({
         where: { id: passwordReset.id },
@@ -429,7 +397,6 @@ router.post('/reset-password', [
       });
     } catch (dbError) {
       console.error('Database error when marking token as used:', dbError.message);
-      // Continuamos aunque no se pueda marcar el token
     }
 
     res.json({
