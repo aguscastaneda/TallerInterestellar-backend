@@ -3,6 +3,9 @@ const { body, validationResult } = require('express-validator');
 const { PrismaClient } = require('@prisma/client');
 const licensePlateValidator = require('../utils/licensePlateValidator');
 
+
+const { authenticateToken, requireRole } = require('../middlewares/authMiddleware');
+
 const router = express.Router();
 const prisma = new PrismaClient();
 
@@ -18,7 +21,7 @@ const handleValidationErrors = (req, res, next) => {
   next();
 };
 
-router.get('/', async (req, res) => {
+router.get('/', requireRole('admin', 'recepcionista'), async (req, res) => {
   try {
     const cars = await prisma.car.findMany({
       include: {
@@ -68,7 +71,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-router.get('/plate/:licensePlate', async (req, res) => {
+router.get('/plate/:licensePlate', requireRole('admin'), async (req, res) => {
   try {
     const { licensePlate } = req.params;
     const car = await prisma.car.findUnique({
@@ -94,6 +97,14 @@ router.get('/plate/:licensePlate', async (req, res) => {
 router.get('/client/:clientId', async (req, res) => {
   try {
     const { clientId } = req.params;
+
+    if (req.user.role !== 'admin' && req.user.client?.id !== parseInt(clientId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Acceso denegado. No puedes ver autos de otros clientes.'
+      });
+    }
+
     const cars = await prisma.car.findMany({
       where: { clientId: parseInt(clientId) },
       include: {
@@ -171,6 +182,18 @@ router.get('/:id', async (req, res) => {
       });
     }
 
+    const isOwner = req.user.client?.id === car.clientId;
+    const isAdmin = req.user.role === 'admin';
+    const isMechanic = req.user.role === 'mecanico';
+    const isBoss = req.user.role === 'jefe';
+
+    if (!isOwner && !isAdmin && !isMechanic && !isBoss) {
+      return res.status(403).json({
+        success: false,
+        message: 'Acceso denegado. No tienes permiso para ver este auto.'
+      });
+    }
+
     res.json({
       success: true,
       data: car
@@ -184,7 +207,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-router.post('/', [
+router.post('/', requireRole('admin', 'recepcionista'), [
   body('clientId').isInt({ min: 1 }).withMessage('El ID del cliente es obligatorio'),
   body('licensePlate').notEmpty().trim().withMessage('La patente es obligatoria').custom((value) => {
     try {
@@ -290,7 +313,7 @@ router.post('/', [
   }
 });
 
-router.put('/:id', [
+router.put('/:id', requireRole('admin', 'recepcionista'), [
   body('licensePlate').optional().trim().custom((value) => {
     try {
       licensePlateValidator(value);
@@ -362,7 +385,6 @@ router.put('/:id', [
       }
     }
 
-
     const updatedCar = await prisma.car.update({
       where: { id: parseInt(id) },
       data: updateData,
@@ -412,7 +434,7 @@ router.put('/:id', [
   }
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireRole('admin'), async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -456,7 +478,7 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-router.get('/status/:statusId', async (req, res) => {
+router.get('/status/:statusId', requireRole('admin', 'mecanico', 'jefe'), async (req, res) => {
   try {
     const { statusId } = req.params;
 

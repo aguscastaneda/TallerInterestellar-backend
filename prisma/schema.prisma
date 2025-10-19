@@ -107,9 +107,10 @@ model Mechanic {
 }
 
 model CarStatus {
-  id   Int    @id @default(autoincrement()) @db.TinyInt
-  name String @db.VarChar(50)
-  cars Car[]
+  id      Int      @id @default(autoincrement()) @db.TinyInt
+  name    String   @db.VarChar(50)
+  cars    Car[]
+  repairs Repair[]
 
   @@unique([name])
 
@@ -139,17 +140,19 @@ model Car {
 }
 
 model Repair {
-  id          Int      @id @default(autoincrement())
+  id          Int        @id @default(autoincrement())
   carId       Int
-  car         Car      @relation(fields: [carId], references: [id])
+  car         Car        @relation(fields: [carId], references: [id])
   mechanicId  Int
-  mechanic    Mechanic @relation(fields: [mechanicId], references: [id])
-  description String   @db.Text
-  cost        Decimal  @db.Decimal(10, 2)
-  warranty    Int      @default(90)
+  mechanic    Mechanic   @relation(fields: [mechanicId], references: [id])
+  statusId    Int        @default(1) @db.TinyInt
+  status      CarStatus  @relation(fields: [statusId], references: [id])
+  description String     @db.Text
+  cost        Decimal    @db.Decimal(10, 2)
+  warranty    Int        @default(90)
   payments    Payment[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 
   @@map("Repair")
 }

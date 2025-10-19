@@ -2,6 +2,8 @@ const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const { ROLES, CAR_STATUS, SERVICE_REQUEST_STATUS, PAYMENT_STATUS, PAYMENT_METHODS, STATUS_TRANSLATIONS, CAR_STATUS_COLORS, CAR_STATUS_TAB_COLORS } = require('../constants');
 
+const { authenticateToken, requireRole } = require('../middlewares/authMiddleware');
+
 const router = express.Router();
 const prisma = new PrismaClient();
 

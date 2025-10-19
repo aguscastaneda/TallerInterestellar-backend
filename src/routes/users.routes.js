@@ -4,6 +4,8 @@ const bcrypt = require('bcryptjs');
 const { PrismaClient } = require('@prisma/client');
 const { ROLES } = require('../constants');
 
+const { authenticateToken, requireRole } = require('../middlewares/authMiddleware');
+
 const router = express.Router();
 const prisma = new PrismaClient();
 
@@ -19,7 +21,7 @@ const handleValidationErrors = (req, res, next) => {
   next();
 };
 
-router.post('/', [
+router.post('/', requireRole('admin'), [
   body('name').notEmpty().trim(),
   body('lastName').notEmpty().trim(),
   body('email').isEmail(),
@@ -149,7 +151,7 @@ router.post('/', [
   }
 });
 
-router.get('/', async (req, res) => {
+router.get('/', requireRole('admin'), async (req, res) => {
   try {
     const users = await prisma.user.findMany({
       select: {
@@ -166,6 +168,39 @@ router.get('/', async (req, res) => {
             name: true
           }
         },
+        client: true,
+        mechanic: {
+          include: {
+            boss: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                    lastName: true
+                  }
+                }
+              }
+            }
+          }
+        },
+        boss: {
+          include: {
+            mechanics: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                    lastName: true,
+                    active: true
+                  }
+                }
+              }
+            }
+          }
+        },
+        admin: true,
         createdAt: true
       },
       orderBy: {
@@ -189,6 +224,13 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
+
+    if (req.user.role !== 'admin' && req.user.id !== parseInt(id)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Acceso denegado. No puedes ver el perfil de otros usuarios.'
+      });
+    }
 
     const user = await prisma.user.findUnique({
       where: { id: parseInt(id) },
@@ -235,19 +277,17 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-router.put('/:id', [
-  body('name').optional().trim(),
-  body('lastName').optional().trim(),
-  body('phone').optional().trim(),
-  body('cuil').optional().trim(),
-  body('email').optional().isEmail(),
-  body('password').optional().isLength({ min: 6 }),
-  body('active').optional().isBoolean(),
-  handleValidationErrors
-], async (req, res) => {
+router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const updateData = req.body;
+
+    if (req.user.role !== 'admin' && req.user.id !== parseInt(id)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Acceso denegado. No puedes actualizar el perfil de otros usuarios.'
+      });
+    }
 
     const existingUser = await prisma.user.findUnique({
       where: { id: parseInt(id) }
@@ -314,14 +354,17 @@ router.put('/:id', [
   }
 });
 
-router.put('/:id/change-password', [
-  body('currentPassword').notEmpty(),
-  body('newPassword').isLength({ min: 6 }),
-  handleValidationErrors
-], async (req, res) => {
+router.put('/:id/change-password', async (req, res) => {
   try {
     const { id } = req.params;
     const { currentPassword, newPassword } = req.body;
+
+    if (req.user.role !== 'admin' && req.user.id !== parseInt(id)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Acceso denegado. No puedes cambiar la contraseña de otros usuarios.'
+      });
+    }
 
     const existingUser = await prisma.user.findUnique({
       where: { id: parseInt(id) }
@@ -334,12 +377,14 @@ router.put('/:id/change-password', [
       });
     }
 
-    const isValidPassword = await bcrypt.compare(currentPassword, existingUser.password);
-    if (!isValidPassword) {
-      return res.status(400).json({
-        success: false,
-        message: 'Contraseña actual incorrecta'
-      });
+    if (req.user.id === parseInt(id)) {
+      const isValidPassword = await bcrypt.compare(currentPassword, existingUser.password);
+      if (!isValidPassword) {
+        return res.status(400).json({
+          success: false,
+          message: 'Contraseña actual incorrecta'
+        });
+      }
     }
 
     const hashedNewPassword = await bcrypt.hash(newPassword, 12);
@@ -363,7 +408,7 @@ router.put('/:id/change-password', [
   }
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireRole('admin'), async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -398,7 +443,7 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-router.get('/role/:roleId', async (req, res) => {
+router.get('/role/:roleId', requireRole('admin'), async (req, res) => {
   try {
     const { roleId } = req.params;
 
@@ -440,7 +485,7 @@ router.get('/role/:roleId', async (req, res) => {
   }
 });
 
-router.get('/mechanics/list', async (req, res) => {
+router.get('/mechanics/list', requireRole('admin', 'jefe', 'recepcionista'), async (req, res) => {
   try {
     const mechanics = await prisma.mechanic.findMany({
       include: {
@@ -480,7 +525,7 @@ router.get('/mechanics/list', async (req, res) => {
   }
 });
 
-router.get('/bosses/list', async (req, res) => {
+router.get('/bosses/list', requireRole('admin', 'recepcionista'), async (req, res) => {
   try {
     const bosses = await prisma.boss.findMany({
       include: {
@@ -497,13 +542,20 @@ router.get('/bosses/list', async (req, res) => {
   }
 });
 
-router.put('/mechanics/:mechanicId/assign-boss', [
+router.put('/mechanics/:mechanicId/assign-boss', requireRole('admin', 'jefe'), [
   body('bossId').isInt({ min: 1 }),
   handleValidationErrors
 ], async (req, res) => {
   try {
     const { mechanicId } = req.params;
     const { bossId } = req.body;
+
+    if (req.user.role === 'jefe' && req.user.boss?.id !== parseInt(bossId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Acceso denegado. Solo puedes asignar jefes a tus propios mecánicos.'
+      });
+    }
 
     const mech = await prisma.mechanic.findUnique({ where: { id: parseInt(mechanicId) } });
     if (!mech) return res.status(404).json({ success: false, message: 'Mecánico no encontrado' });
@@ -519,7 +571,7 @@ router.put('/mechanics/:mechanicId/assign-boss', [
   }
 });
 
-router.get('/clients/list', async (req, res) => {
+router.get('/clients/list', requireRole('admin', 'recepcionista'), async (req, res) => {
   try {
     const clients = await prisma.client.findMany({
       include: {

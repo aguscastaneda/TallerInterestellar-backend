@@ -1,13 +1,32 @@
 const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 
+// Import authentication middleware
+const { authenticateToken, requireRole } = require('../middlewares/authMiddleware');
+
 const router = express.Router();
 const prisma = new PrismaClient();
 
 
+// Get client repairs (client can only see their own repairs)
 router.get('/:clientId', async (req, res) => {
   try {
     const { clientId } = req.params;
+    
+    // Check if the requesting user is the owner of the repairs or has admin role
+    if (req.user.role !== 'admin' && req.user.role !== 'cliente' && req.user.client?.id !== parseInt(clientId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Acceso denegado. No puedes ver reparaciones de otros clientes.'
+      });
+    }
+    
+    if (req.user.role === 'cliente' && req.user.client?.id !== parseInt(clientId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Acceso denegado. No puedes ver reparaciones de otros clientes.'
+      });
+    }
 
     const cars = await prisma.car.findMany({
       where: { clientId: parseInt(clientId) },
@@ -104,9 +123,25 @@ router.get('/:clientId', async (req, res) => {
 });
 
 
+// Get client repairs by status (client can only see their own repairs)
 router.get('/:clientId/status/:statusId', async (req, res) => {
   try {
     const { clientId, statusId } = req.params;
+    
+    // Check if the requesting user is the owner of the repairs or has admin role
+    if (req.user.role !== 'admin' && req.user.role !== 'cliente' && req.user.client?.id !== parseInt(clientId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Acceso denegado. No puedes ver reparaciones de otros clientes.'
+      });
+    }
+    
+    if (req.user.role === 'cliente' && req.user.client?.id !== parseInt(clientId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Acceso denegado. No puedes ver reparaciones de otros clientes.'
+      });
+    }
 
     const cars = await prisma.car.findMany({
       where: {

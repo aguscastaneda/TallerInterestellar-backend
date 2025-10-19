@@ -2,6 +2,8 @@ const express = require('express');
 const { body, validationResult } = require('express-validator');
 const { PrismaClient } = require('@prisma/client');
 
+const { authenticateToken, requireRole } = require('../middlewares/authMiddleware');
+
 const router = express.Router();
 const prisma = new PrismaClient();
 
@@ -77,6 +79,19 @@ router.post('/create-preference', [
 
     console.log('Starting payment process:', { repairId, clientId });
 
+    if (req.user.role !== 'admin' && req.user.role !== 'cliente' && req.user.client?.id !== parseInt(clientId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Acceso denegado. No puedes crear pagos para otros clientes.'
+      });
+    }
+
+    if (req.user.role === 'cliente' && req.user.client?.id !== parseInt(clientId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Acceso denegado. No puedes crear pagos para otros clientes.'
+      });
+    }
 
     const repair = await prisma.repair.findUnique({
       where: { id: parseInt(repairId) },
@@ -101,14 +116,12 @@ router.post('/create-preference', [
       }
     });
 
-
     if (!repair) {
       return res.status(404).json({
         success: false,
         message: 'Repair not found'
       });
     }
-
 
     if (repair.car.client.id !== parseInt(clientId)) {
       return res.status(403).json({
@@ -117,7 +130,6 @@ router.post('/create-preference', [
       });
     }
 
-
     const repairCost = parseFloat(repair.cost);
     if (!repairCost || repairCost <= 0) {
       return res.status(400).json({
@@ -125,7 +137,6 @@ router.post('/create-preference', [
         message: 'Invalid repair cost for payment processing'
       });
     }
-
 
     const existingPayment = await prisma.payment.findFirst({
       where: {
@@ -141,7 +152,6 @@ router.post('/create-preference', [
       });
     }
 
-
     const user = repair.car.client.user;
     if (!user.name || !user.lastName) {
       return res.status(400).json({
@@ -151,7 +161,6 @@ router.post('/create-preference', [
     }
 
     console.log('Validation passed. Creating payment preference...');
-
 
     if (!isConfigured) {
       console.log('Using simulation mode');
@@ -181,7 +190,6 @@ router.post('/create-preference', [
         }
       });
     }
-
 
     const preferenceData = {
       items: [{
@@ -277,8 +285,6 @@ router.post('/webhook', async (req, res) => {
     if (type === 'payment') {
       const paymentId = data.id;
       console.log(`Payment notification received: ${paymentId}`);
-
-
     }
 
     res.status(200).send('OK');

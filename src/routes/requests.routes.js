@@ -4,6 +4,9 @@ const { PrismaClient } = require('@prisma/client');
 const { CAR_STATUS, SERVICE_REQUEST_STATUS } = require('../constants');
 const emailService = require('../services/emailService');
 
+// Import authentication middleware
+const { authenticateToken, requireRole } = require('../middlewares/authMiddleware');
+
 const router = express.Router();
 const prisma = new PrismaClient();
 
@@ -15,6 +18,7 @@ const handleValidationErrors = (req, res, next) => {
   next();
 };
 
+// Create request (client can only create for themselves)
 router.post('/', [
   body('carId').isInt({ min: 1 }),
   body('clientId').isInt({ min: 1 }),
@@ -24,6 +28,21 @@ router.post('/', [
 ], async (req, res) => {
   try {
     const { carId, clientId, description, preferredMechanicId } = req.body;
+    
+    // Check if the requesting user is the owner of the request or has admin role
+    if (req.user.role !== 'admin' && req.user.role !== 'cliente' && req.user.client?.id !== parseInt(clientId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Acceso denegado. No puedes crear solicitudes para otros clientes.'
+      });
+    }
+    
+    if (req.user.role === 'cliente' && req.user.client?.id !== parseInt(clientId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Acceso denegado. No puedes crear solicitudes para otros clientes.'
+      });
+    }
 
     const car = await prisma.car.findUnique({ where: { id: carId } });
     if (!car || car.clientId !== clientId) {
@@ -84,9 +103,26 @@ router.post('/', [
   }
 });
 
+// Get requests by boss ID (boss can only see their own requests, admin can see all)
 router.get('/boss/:bossId', async (req, res) => {
   try {
     const { bossId } = req.params;
+    
+    // Check if the requesting user is the owner of the requests or has admin role
+    if (req.user.role !== 'admin' && req.user.role !== 'jefe' && req.user.boss?.id !== parseInt(bossId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Acceso denegado. No puedes ver solicitudes de otros jefes.'
+      });
+    }
+    
+    if (req.user.role === 'jefe' && req.user.boss?.id !== parseInt(bossId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Acceso denegado. No puedes ver solicitudes de otros jefes.'
+      });
+    }
+
     const requests = await prisma.serviceRequest.findMany({
       where: { assignedBossId: parseInt(bossId) },
       include: {
@@ -121,6 +157,7 @@ router.get('/boss/:bossId', async (req, res) => {
   }
 });
 
+// Assign request to mechanic (boss can assign to their mechanics, admin can assign to any)
 router.put('/:id/assign', [
   body('mechanicId').isInt({ min: 1 }),
   handleValidationErrors
@@ -132,8 +169,27 @@ router.put('/:id/assign', [
     const reqDb = await prisma.serviceRequest.findUnique({ where: { id: parseInt(id) }, include: { assignedBoss: true } });
     if (!reqDb) return res.status(404).json({ success: false, message: 'Solicitud no encontrada' });
 
+    // Check permissions
+    const isAdmin = req.user.role === 'admin';
+    const isBoss = req.user.role === 'jefe' && req.user.boss?.id === reqDb.assignedBossId;
+    
+    if (!isAdmin && !isBoss) {
+      return res.status(403).json({
+        success: false,
+        message: 'Acceso denegado. No tienes permiso para asignar esta solicitud.'
+      });
+    }
+
     const mech = await prisma.mechanic.findUnique({ where: { id: mechanicId } });
     if (!mech) return res.status(400).json({ success: false, message: 'Mecánico no válido' });
+
+    // If boss, check that mechanic belongs to them
+    if (req.user.role === 'jefe' && mech.bossId !== req.user.boss?.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'Acceso denegado. Solo puedes asignar mecánicos bajo tu supervisión.'
+      });
+    }
 
     const updated = await prisma.serviceRequest.update({
       where: { id: parseInt(id) },
@@ -175,6 +231,7 @@ router.put('/:id/assign', [
   }
 });
 
+// Update request status (mechanic can update their assigned requests, boss can update their team's, admin can update all)
 router.put('/:id/status', [
   body('status').isIn([SERVICE_REQUEST_STATUS.IN_PROGRESS, SERVICE_REQUEST_STATUS.COMPLETED]),
   body('description').optional().trim(),
@@ -185,8 +242,23 @@ router.put('/:id/status', [
     const { id } = req.params;
     const { status, description, cost } = req.body;
 
-    const reqDb = await prisma.serviceRequest.findUnique({ where: { id: parseInt(id) } });
+    const reqDb = await prisma.serviceRequest.findUnique({ 
+      where: { id: parseInt(id) },
+      include: { assignedMechanic: true }
+    });
     if (!reqDb) return res.status(404).json({ success: false, message: 'Solicitud no encontrada' });
+
+    // Check permissions
+    const isAdmin = req.user.role === 'admin';
+    const isMechanic = req.user.role === 'mecanico' && req.user.mechanic?.id === reqDb.assignedMechanicId;
+    const isBoss = req.user.role === 'jefe';
+    
+    if (!isAdmin && !isMechanic && !isBoss) {
+      return res.status(403).json({
+        success: false,
+        message: 'Acceso denegado. No tienes permiso para actualizar esta solicitud.'
+      });
+    }
 
     const updated = await prisma.serviceRequest.update({
       where: { id: parseInt(id) },
@@ -257,6 +329,7 @@ router.put('/:id/status', [
   }
 });
 
+// Send budget (mechanic can send for their assigned requests, boss can send for their team's, admin can send all)
 router.post('/:id/budget', [
   body('description').notEmpty().trim(),
   body('cost').isFloat({ min: 0 }),
@@ -309,6 +382,18 @@ router.post('/:id/budget', [
       return res.status(404).json({ success: false, message: 'Solicitud no encontrada' });
     }
 
+    // Check permissions
+    const isAdmin = req.user.role === 'admin';
+    const isMechanic = req.user.role === 'mecanico' && req.user.mechanic?.id === request.assignedMechanicId;
+    const isBoss = req.user.role === 'jefe';
+    
+    if (!isAdmin && !isMechanic && !isBoss) {
+      return res.status(403).json({
+        success: false,
+        message: 'Acceso denegado. No tienes permiso para enviar presupuesto para esta solicitud.'
+      });
+    }
+
     const updatedRequest = await prisma.serviceRequest.update({
       where: { id: parseInt(id) },
       data: { status: SERVICE_REQUEST_STATUS.PRESUPUESTO_ENVIADO }
@@ -349,6 +434,7 @@ router.post('/:id/budget', [
   }
 });
 
+// Cancel request (client can cancel their own, admin can cancel all)
 router.post('/:id/cancel', async (req, res) => {
   try {
     const { id } = req.params;
@@ -383,6 +469,17 @@ router.post('/:id/cancel', async (req, res) => {
 
     if (!request) {
       return res.status(404).json({ success: false, message: 'Solicitud no encontrada' });
+    }
+
+    // Check permissions
+    const isAdmin = req.user.role === 'admin';
+    const isClient = req.user.role === 'cliente' && req.user.client?.id === request.clientId;
+    
+    if (!isAdmin && !isClient) {
+      return res.status(403).json({
+        success: false,
+        message: 'Acceso denegado. No tienes permiso para cancelar esta solicitud.'
+      });
     }
 
     const updatedRequest = await prisma.serviceRequest.update({
@@ -425,9 +522,36 @@ router.post('/:id/cancel', async (req, res) => {
   }
 });
 
+// Get requests by mechanic ID (mechanic can only see their own, boss can see their team's, admin can see all)
 router.get('/mechanic/:mechanicId', async (req, res) => {
   try {
     const { mechanicId } = req.params;
+    
+    // Debug logging
+    console.log('Mechanic ID from URL:', mechanicId);
+    console.log('User role:', req.user.role);
+    console.log('User mechanic ID:', req.user.mechanic?.id);
+    
+    // Check permissions - normalize role names to lowercase
+    const userRole = req.user.role?.name?.toLowerCase();
+    const isAdmin = userRole === 'admin';
+    const isMechanic = userRole === 'mecánico' || userRole === 'mecanico';
+    const mechanicOwnsRequests = req.user.mechanic?.id === parseInt(mechanicId);
+    const isBoss = userRole === 'jefe';
+    
+    console.log('Permissions check - isAdmin:', isAdmin, 'isMechanic:', isMechanic, 'mechanicOwnsRequests:', mechanicOwnsRequests, 'isBoss:', isBoss);
+    
+    // Allow access if:
+    // 1. User is admin
+    // 2. User is mechanic and accessing their own requests
+    // 3. User is boss
+    if (!isAdmin && !(isMechanic && mechanicOwnsRequests) && !isBoss) {
+      return res.status(403).json({
+        success: false,
+        message: 'Acceso denegado. No tienes permiso para ver solicitudes de otros mecánicos.'
+      });
+    }
+
     const requests = await prisma.serviceRequest.findMany({
       where: { assignedMechanicId: parseInt(mechanicId) },
       include: {
@@ -459,9 +583,26 @@ router.get('/mechanic/:mechanicId', async (req, res) => {
   }
 });
 
+// Get requests by client ID (client can only see their own, admin can see all)
 router.get('/client/:clientId', async (req, res) => {
   try {
     const { clientId } = req.params;
+    
+    // Check if the requesting user is the owner of the requests or has admin role
+    if (req.user.role !== 'admin' && req.user.role !== 'cliente' && req.user.client?.id !== parseInt(clientId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Acceso denegado. No puedes ver solicitudes de otros clientes.'
+      });
+    }
+    
+    if (req.user.role === 'cliente' && req.user.client?.id !== parseInt(clientId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Acceso denegado. No puedes ver solicitudes de otros clientes.'
+      });
+    }
+
     const requests = await prisma.serviceRequest.findMany({
       where: { clientId: parseInt(clientId) },
       include: {

@@ -3,6 +3,8 @@ const cors = require('cors');
 require('dotenv').config();
 const { PrismaClient } = require('@prisma/client');
 
+const { authenticateToken, requireRole } = require('./middlewares/authMiddleware');
+
 const authRoutes = require('./routes/auth.routes');
 const carsRoutes = require('./routes/cars.routes');
 const repairsRoutes = require('./routes/repairs.routes');
@@ -31,15 +33,16 @@ app.get('/api/health', (req, res) => {
 });
 
 app.use('/api/auth', authRoutes);
-app.use('/api/cars', carsRoutes);
-app.use('/api/repairs', repairsRoutes);
-app.use('/api/users', usersRoutes);
-app.use('/api/payments', paymentsRoutes);
-app.use('/api/requests', requestsRoutes);
-app.use('/api/car-states', carStatesRoutes);
-app.use('/api/client-repairs', clientRepairsRoutes);
-app.use('/api/config', configRoutes);
-app.use('/api/email', emailRoutes);
+
+app.use('/api/cars', authenticateToken, carsRoutes);
+app.use('/api/repairs', authenticateToken, repairsRoutes);
+app.use('/api/users', authenticateToken, usersRoutes);
+app.use('/api/payments', authenticateToken, paymentsRoutes);
+app.use('/api/requests', authenticateToken, requestsRoutes);
+app.use('/api/car-states', authenticateToken, carStatesRoutes);
+app.use('/api/client-repairs', authenticateToken, clientRepairsRoutes);
+app.use('/api/config', authenticateToken, configRoutes);
+app.use('/api/email', authenticateToken, emailRoutes);
 
 app.use('*', (req, res) => {
   res.status(404).json({

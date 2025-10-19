@@ -1,7 +1,9 @@
-import jwt from 'jsonwebtoken';
-import { User } from '../models/index.js';
-import { validationResult } from 'express-validator';
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
+const { PrismaClient } = require('@prisma/client');
+const { validationResult } = require('express-validator');
 
+const prisma = new PrismaClient();
 
 const generateToken = (userId) => {
   return jwt.sign(
@@ -11,10 +13,13 @@ const generateToken = (userId) => {
   );
 };
 
+const userToPublicJSON = (user) => {
+  const { password, ...userWithoutPassword } = user;
+  return userWithoutPassword;
+};
 
-export const login = async (req, res) => {
+const login = async (req, res) => {
   try {
-
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({
@@ -26,9 +31,18 @@ export const login = async (req, res) => {
 
     const { email, password } = req.body;
 
+    const user = await prisma.user.findUnique({
+      where: { email },
+      include: {
+        role: true,
+        client: true,
+        mechanic: true,
+        boss: true,
+        admin: true,
+        recepcionista: true
+      }
+    });
 
-    const user = await User.findOne({ where: { email } });
-    
     if (!user) {
       return res.status(401).json({
         success: false,
@@ -36,16 +50,14 @@ export const login = async (req, res) => {
       });
     }
 
-
-    if (!user.activo) {
+    if (!user.active) {
       return res.status(401).json({
         success: false,
         message: 'Cuenta desactivada. Contacta al administrador.'
       });
     }
 
-
-    const isPasswordValid = await user.comparePassword(password);
+    const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
       return res.status(401).json({
         success: false,
@@ -53,18 +65,18 @@ export const login = async (req, res) => {
       });
     }
 
-
-    await user.update({ ultimoAcceso: new Date() });
-
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLogin: new Date() }
+    });
 
     const token = generateToken(user.id);
-
 
     res.json({
       success: true,
       message: 'Login exitoso',
       data: {
-        user: user.toPublicJSON(),
+        user: userToPublicJSON(user),
         token,
         expiresIn: process.env.JWT_EXPIRES_IN || '24h'
       }
@@ -79,10 +91,8 @@ export const login = async (req, res) => {
   }
 };
 
-
-export const register = async (req, res) => {
+const register = async (req, res) => {
   try {
-
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({
@@ -92,10 +102,9 @@ export const register = async (req, res) => {
       });
     }
 
-    const { nombre, apellido, email, cuil, telefono, password } = req.body;
+    const { name, lastName, email, cuil, phone, password } = req.body;
 
-
-    const existingUser = await User.findOne({ where: { email } });
+    const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
       return res.status(400).json({
         success: false,
@@ -103,8 +112,7 @@ export const register = async (req, res) => {
       });
     }
 
-
-    const existingCUIL = await User.findOne({ where: { cuil } });
+    const existingCUIL = await prisma.user.findUnique({ where: { cuil } });
     if (existingCUIL) {
       return res.status(400).json({
         success: false,
@@ -112,27 +120,31 @@ export const register = async (req, res) => {
       });
     }
 
+    const hashedPassword = await bcrypt.hash(password, 12);
 
-    const newUser = await User.create({
-      nombre,
-      apellido,
-      email,
-      cuil,
-      telefono,
-      password,
-      rol: 'cliente',
-      activo: true
+    const newUser = await prisma.user.create({
+      data: {
+        name,
+        lastName,
+        email,
+        cuil,
+        phone,
+        password: hashedPassword,
+        roleId: 1,
+        active: true
+      },
+      include: {
+        role: true
+      }
     });
 
-
     const token = generateToken(newUser.id);
-
 
     res.status(201).json({
       success: true,
       message: 'Cliente registrado exitosamente',
       data: {
-        user: newUser.toPublicJSON(),
+        user: userToPublicJSON(newUser),
         token,
         expiresIn: process.env.JWT_EXPIRES_IN || '24h'
       }
@@ -140,20 +152,8 @@ export const register = async (req, res) => {
 
   } catch (error) {
     console.error('Error en registro:', error);
-    
 
-    if (error.name === 'SequelizeValidationError') {
-      return res.status(400).json({
-        success: false,
-        message: 'Datos de entrada inválidos',
-        errors: error.errors.map(err => ({
-          field: err.path,
-          message: err.message
-        }))
-      });
-    }
-
-    if (error.name === 'SequelizeUniqueConstraintError') {
+    if (error.code === 'P2002') {
       return res.status(400).json({
         success: false,
         message: 'El email o CUIL ya está registrado'
@@ -167,15 +167,24 @@ export const register = async (req, res) => {
   }
 };
 
-
-export const getProfile = async (req, res) => {
+const getProfile = async (req, res) => {
   try {
-    const user = req.user;
-    
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      include: {
+        role: true,
+        client: true,
+        mechanic: true,
+        boss: true,
+        admin: true,
+        recepcionista: true
+      }
+    });
+
     res.json({
       success: true,
       data: {
-        user: user.toPublicJSON()
+        user: userToPublicJSON(user)
       }
     });
   } catch (error) {
@@ -187,8 +196,7 @@ export const getProfile = async (req, res) => {
   }
 };
 
-
-export const changePassword = async (req, res) => {
+const changePassword = async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -200,10 +208,12 @@ export const changePassword = async (req, res) => {
     }
 
     const { currentPassword, newPassword } = req.body;
-    const user = req.user;
 
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id }
+    });
 
-    const isCurrentPasswordValid = await user.comparePassword(currentPassword);
+    const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password);
     if (!isCurrentPasswordValid) {
       return res.status(400).json({
         success: false,
@@ -211,8 +221,12 @@ export const changePassword = async (req, res) => {
       });
     }
 
+    const hashedNewPassword = await bcrypt.hash(newPassword, 12);
 
-    await user.update({ password: newPassword });
+    await prisma.user.update({
+      where: { id: req.user.id },
+      data: { password: hashedNewPassword }
+    });
 
     res.json({
       success: true,
@@ -227,10 +241,9 @@ export const changePassword = async (req, res) => {
     });
   }
 };
- 
-export const logout = async (req, res) => {
-  try {
 
+const logout = async (req, res) => {
+  try {
     res.json({
       success: true,
       message: 'Logout exitoso'
@@ -242,4 +255,12 @@ export const logout = async (req, res) => {
       message: 'Error interno del servidor'
     });
   }
+};
+
+module.exports = {
+  login,
+  register,
+  getProfile,
+  changePassword,
+  logout
 };

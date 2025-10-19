@@ -1,10 +1,12 @@
-import jwt from 'jsonwebtoken';
-import { User } from '../models/index.js';
+const jwt = require('jsonwebtoken');
+const { PrismaClient } = require('@prisma/client');
 
-export const authenticateToken = async (req, res, next) => {
+const prisma = new PrismaClient();
+
+const authenticateToken = async (req, res, next) => {
   try {
     const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+    const token = authHeader && authHeader.split(' ')[1];
 
     if (!token) {
       return res.status(401).json({
@@ -15,9 +17,19 @@ export const authenticateToken = async (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    const user = await User.findByPk(decoded.userId);
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+      include: {
+        role: true,
+        client: true,
+        mechanic: true,
+        boss: true,
+        admin: true,
+        recepcionista: true
+      }
+    });
 
-    if (!user || !user.activo) {
+    if (!user || !user.active) {
       return res.status(401).json({
         success: false,
         message: 'Usuario no válido o inactivo'
@@ -49,7 +61,7 @@ export const authenticateToken = async (req, res, next) => {
   }
 };
 
-export const requireRole = (...roles) => {
+const requireRole = (...roles) => {
   return (req, res, next) => {
     if (!req.user) {
       return res.status(401).json({
@@ -58,7 +70,9 @@ export const requireRole = (...roles) => {
       });
     }
 
-    if (!roles.includes(req.user.rol)) {
+    const userRole = req.user.role?.name?.toLowerCase();
+
+    if (!userRole || !roles.map(r => r.toLowerCase()).includes(userRole)) {
       return res.status(403).json({
         success: false,
         message: 'Acceso denegado. Rol insuficiente.'
@@ -69,8 +83,18 @@ export const requireRole = (...roles) => {
   };
 };
 
-export const requireAdmin = requireRole('admin');
-export const requireJefe = requireRole('jefe', 'admin');
-export const requireMecanico = requireRole('mecanico', 'jefe', 'admin');
-export const requireCliente = requireRole('cliente');
-export const requireAuthenticated = requireRole('cliente', 'mecanico', 'jefe', 'admin');
+const requireAdmin = requireRole('admin');
+const requireJefe = requireRole('jefe', 'admin');
+const requireMecanico = requireRole('mecanico', 'jefe', 'admin');
+const requireCliente = requireRole('cliente');
+const requireAuthenticated = requireRole('cliente', 'mecanico', 'jefe', 'admin');
+
+module.exports = {
+  authenticateToken,
+  requireRole,
+  requireAdmin,
+  requireJefe,
+  requireMecanico,
+  requireCliente,
+  requireAuthenticated
+};

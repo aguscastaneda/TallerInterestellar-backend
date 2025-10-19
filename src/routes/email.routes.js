@@ -3,6 +3,8 @@ const { body, validationResult } = require('express-validator');
 const { PrismaClient } = require('@prisma/client');
 const emailService = require('../services/emailService');
 
+const { authenticateToken, requireRole } = require('../middlewares/authMiddleware');
+
 const router = express.Router();
 const prisma = new PrismaClient();
 
@@ -18,7 +20,7 @@ const handleValidationErrors = (req, res, next) => {
   next();
 };
 
-router.post('/test', [
+router.post('/test', requireRole('admin'), [
   body('email').isEmail().withMessage('Valid email is required'),
   handleValidationErrors
 ], async (req, res) => {
@@ -56,7 +58,7 @@ router.post('/test', [
   }
 });
 
-router.post('/registration-confirmation', [
+router.post('/registration-confirmation', requireRole('admin'), [
   body('email').isEmail().withMessage('Valid email is required'),
   body('name').notEmpty().withMessage('Name is required'),
   handleValidationErrors
@@ -106,7 +108,7 @@ router.post('/registration-confirmation', [
   }
 });
 
-router.get('/status', (req, res) => {
+router.get('/status', requireRole('admin'), (req, res) => {
   res.json({
     success: true,
     data: {
@@ -119,7 +121,7 @@ router.get('/status', (req, res) => {
   });
 });
 
-router.post('/test-car-state-change', async (req, res) => {
+router.post('/test-car-state-change', requireRole('admin'), async (req, res) => {
   try {
     const { carId, testEmail } = req.body;
 

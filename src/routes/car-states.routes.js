@@ -3,10 +3,12 @@ const { PrismaClient } = require('@prisma/client');
 const { CAR_STATUS, SERVICE_REQUEST_STATUS } = require('../constants');
 const emailService = require('../services/emailService');
 
+const { authenticateToken, requireRole } = require('../middlewares/authMiddleware');
+
 const router = express.Router();
 const prisma = new PrismaClient();
 
-router.post('/transition', async (req, res) => {
+router.post('/transition', requireRole('admin', 'mecanico', 'jefe'), async (req, res) => {
   try {
     const { carId, newStatusId, description } = req.body;
 
@@ -119,6 +121,32 @@ router.post('/accept-budget', async (req, res) => {
       });
     }
 
+    const car = await prisma.car.findUnique({
+      where: { id: parseInt(carId) },
+      include: { client: true }
+    });
+
+    if (!car) {
+      return res.status(404).json({
+        success: false,
+        message: 'Auto no encontrado'
+      });
+    }
+
+    if (req.user.role !== 'admin' && req.user.role !== 'cliente' && req.user.client?.id !== car.clientId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Acceso denegado. No puedes aceptar presupuestos de otros autos.'
+      });
+    }
+
+    if (req.user.role === 'cliente' && req.user.client?.id !== car.clientId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Acceso denegado. No puedes aceptar presupuestos de otros autos.'
+      });
+    }
+
     const serviceRequest = await prisma.serviceRequest.findFirst({
       where: {
         carId: parseInt(carId),
@@ -198,6 +226,32 @@ router.post('/reject-budget', async (req, res) => {
       });
     }
 
+    const car = await prisma.car.findUnique({
+      where: { id: parseInt(carId) },
+      include: { client: true }
+    });
+
+    if (!car) {
+      return res.status(404).json({
+        success: false,
+        message: 'Auto no encontrado'
+      });
+    }
+
+    if (req.user.role !== 'admin' && req.user.role !== 'cliente' && req.user.client?.id !== car.clientId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Acceso denegado. No puedes rechazar presupuestos de otros autos.'
+      });
+    }
+
+    if (req.user.role === 'cliente' && req.user.client?.id !== car.clientId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Acceso denegado. No puedes rechazar presupuestos de otros autos.'
+      });
+    }
+
     const serviceRequest = await prisma.serviceRequest.findFirst({
       where: {
         carId: parseInt(carId),
@@ -259,7 +313,7 @@ router.post('/reject-budget', async (req, res) => {
   }
 });
 
-router.post('/finish-repair', async (req, res) => {
+router.post('/finish-repair', requireRole('admin', 'mecanico', 'jefe'), async (req, res) => {
   try {
     const { carId, finalDescription, finalCost } = req.body;
 
@@ -267,6 +321,17 @@ router.post('/finish-repair', async (req, res) => {
       return res.status(400).json({
         success: false,
         message: 'carId, finalDescription y finalCost son requeridos'
+      });
+    }
+
+    const isAdmin = req.user.role === 'admin';
+    const isMechanic = req.user.role === 'mecanico';
+    const isBoss = req.user.role === 'jefe';
+
+    if (!isAdmin && !isMechanic && !isBoss) {
+      return res.status(403).json({
+        success: false,
+        message: 'Acceso denegado. No tienes permiso para finalizar reparaciones.'
       });
     }
 
@@ -314,7 +379,7 @@ router.post('/finish-repair', async (req, res) => {
   }
 });
 
-router.post('/deliver-car', async (req, res) => {
+router.post('/deliver-car', requireRole('admin', 'recepcionista'), async (req, res) => {
   try {
     const { carId } = req.body;
 
@@ -322,6 +387,16 @@ router.post('/deliver-car', async (req, res) => {
       return res.status(400).json({
         success: false,
         message: 'carId es requerido'
+      });
+    }
+
+    const isAdmin = req.user.role === 'admin';
+    const isReceptionist = req.user.role === 'recepcionista';
+
+    if (!isAdmin && !isReceptionist) {
+      return res.status(403).json({
+        success: false,
+        message: 'Acceso denegado. No tienes permiso para entregar autos.'
       });
     }
 
