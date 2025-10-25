@@ -2,6 +2,7 @@ const express = require("express");
 const { body, validationResult } = require("express-validator");
 const { PrismaClient } = require("@prisma/client");
 const licensePlateValidator = require("../utils/licensePlateValidator");
+const emailService = require("../services/emailService");
 
 const {
   authenticateToken,
@@ -258,7 +259,7 @@ router.get("/:id", async (req, res) => {
 
 router.post(
   "/",
-  requireRole("admin", "recepcionista"),
+  requireRole("admin", "recepcionista", "cliente"),
   [
     body("clientId")
       .isInt({ min: 1 })
@@ -308,6 +309,13 @@ router.post(
         chassis,
         statusId = 1,
       } = req.body;
+
+      if (req.user.role?.name === 'cliente' && req.user.client?.id !== parseInt(clientId)) {
+        return res.status(403).json({
+          success: false,
+          message: "Acceso denegado. No puedes crear autos para otros clientes.",
+        });
+      }
 
       const licensePlate = licensePlateValidator(rawLicensePlate);
       const capitalizedChassis = chassis.toUpperCase();
@@ -434,6 +442,9 @@ router.put(
 
       const existingCar = await prisma.car.findUnique({
         where: { id: parseInt(id) },
+        include: {
+          status: true,
+        },
       });
 
       if (!existingCar) {
@@ -506,6 +517,18 @@ router.put(
         },
       });
 
+      // Enviar email de notificación si se cambió el estado
+      if (updateData.statusId && updateData.statusId !== existingCar.statusId) {
+        try {
+          await emailService.sendCarStateChangeNotification(
+            updatedCar,
+            existingCar.status
+          );
+        } catch (emailError) {
+          console.error("Error sending car state change email:", emailError);
+        }
+      }
+
       res.json({
         success: true,
         message: "Auto actualizado exitosamente",
@@ -521,7 +544,7 @@ router.put(
   }
 );
 
-router.delete("/:id", requireRole("admin"), async (req, res) => {
+router.delete("/:id", requireRole("admin", "cliente"), async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -536,6 +559,13 @@ router.delete("/:id", requireRole("admin"), async (req, res) => {
       });
     }
 
+    if (req.user.role?.name === 'cliente' && req.user.client?.id !== existingCar.clientId) {
+      return res.status(403).json({
+        success: false,
+        message: "Acceso denegado. No puedes eliminar autos de otros clientes.",
+      });
+    }
+
     const repairs = await prisma.repair.findMany({
       where: { carId: parseInt(id) },
     });
@@ -545,6 +575,18 @@ router.delete("/:id", requireRole("admin"), async (req, res) => {
         success: false,
         message:
           "No se puede eliminar un auto que tiene reparaciones asociadas",
+      });
+    }
+
+    const serviceRequests = await prisma.serviceRequest.findMany({
+      where: { carId: parseInt(id) },
+    });
+
+    if (serviceRequests.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "No se puede eliminar un auto que tiene solicitudes de servicio asociadas",
       });
     }
 

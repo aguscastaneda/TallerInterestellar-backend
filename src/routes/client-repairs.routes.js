@@ -96,6 +96,13 @@ router.get("/:clientId", async (req, res) => {
       },
     });
 
+    console.log("Autos obtenidos para cliente:", clientId, cars.map(car => ({
+      id: car.id,
+      licensePlate: car.licensePlate,
+      statusId: car.statusId,
+      statusName: car.status?.name
+    })));
+
     const allStatuses = await prisma.carStatus.findMany({
       orderBy: { id: "asc" },
     });

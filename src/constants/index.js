@@ -6,7 +6,9 @@ const ROLES = {
   RECEPTIONIST: 5
 };
 
-const CAR_STATUS = {
+
+const SYSTEM_STATUS = {
+
   ENTRADA: 1,
   PENDIENTE: 2,
   EN_REVISION: 3,
@@ -16,6 +18,9 @@ const CAR_STATUS = {
   ENTREGADO: 7,
   CANCELADO: 8
 };
+
+const CAR_STATUS = SYSTEM_STATUS;
+const REPAIR_STATUS = SYSTEM_STATUS;
 
 const SERVICE_REQUEST_STATUS = {
   PENDING: 'PENDING',
@@ -51,49 +56,50 @@ const STATUS_TRANSLATIONS = {
 };
 
 
-const CAR_STATUS_COLORS = {
-  [CAR_STATUS.ENTRADA]: 'bg-gray-100 text-gray-800',
-  [CAR_STATUS.PENDIENTE]: 'bg-yellow-100 text-yellow-800',
-  [CAR_STATUS.EN_REVISION]: 'bg-blue-100 text-blue-800',
-  [CAR_STATUS.RECHAZADO]: 'bg-red-100 text-red-800',
-  [CAR_STATUS.EN_REPARACION]: 'bg-purple-100 text-purple-800',
-  [CAR_STATUS.FINALIZADO]: 'bg-green-100 text-green-800',
-  [CAR_STATUS.ENTREGADO]: 'bg-indigo-100 text-indigo-800',
-  [CAR_STATUS.CANCELADO]: 'bg-orange-100 text-orange-800'
+const STATUS_NAMES = {
+  1: 'Entrada',
+  2: 'Pendiente',
+  3: 'En Revisión',
+  4: 'Rechazado',
+  5: 'En Reparación',
+  6: 'Finalizado',
+  7: 'Entregado',
+  8: 'Cancelado'
 };
 
 
-const CAR_STATUS_TAB_COLORS = {
-  [CAR_STATUS.ENTRADA]: 'bg-gray-500 hover:bg-gray-600',
-  [CAR_STATUS.PENDIENTE]: 'bg-yellow-500 hover:bg-yellow-600',
-  [CAR_STATUS.EN_REVISION]: 'bg-blue-500 hover:bg-blue-600',
-  [CAR_STATUS.RECHAZADO]: 'bg-red-500 hover:bg-red-600',
-  [CAR_STATUS.EN_REPARACION]: 'bg-purple-500 hover:bg-purple-600',
-  [CAR_STATUS.FINALIZADO]: 'bg-green-500 hover:bg-green-600',
-  [CAR_STATUS.ENTREGADO]: 'bg-indigo-500 hover:bg-indigo-600',
-  [CAR_STATUS.CANCELADO]: 'bg-orange-500 hover:bg-orange-600'
+const STATUS_COLORS = {
+  1: 'bg-gray-100 text-gray-800',
+  2: 'bg-yellow-100 text-yellow-800',
+  3: 'bg-blue-100 text-blue-800',
+  4: 'bg-red-100 text-red-800',
+  5: 'bg-purple-100 text-purple-800',
+  6: 'bg-green-100 text-green-800',
+  7: 'bg-indigo-100 text-indigo-800',
+  8: 'bg-orange-100 text-orange-800'
 };
 
-
-const CAR_STATUS_NAMES = {
-  [CAR_STATUS.ENTRADA]: 'Entrada',
-  [CAR_STATUS.PENDIENTE]: 'Pendiente',
-  [CAR_STATUS.EN_REVISION]: 'En Revisión',
-  [CAR_STATUS.RECHAZADO]: 'Rechazado',
-  [CAR_STATUS.EN_REPARACION]: 'En Reparación',
-  [CAR_STATUS.FINALIZADO]: 'Finalizado',
-  [CAR_STATUS.ENTREGADO]: 'Entregado',
-  [CAR_STATUS.CANCELADO]: 'Cancelado'
+const STATUS_TAB_COLORS = {
+  1: 'bg-gray-500 hover:bg-gray-600',
+  2: 'bg-yellow-500 hover:bg-yellow-600',
+  3: 'bg-blue-500 hover:bg-blue-600',
+  4: 'bg-red-500 hover:bg-red-600',
+  5: 'bg-purple-500 hover:bg-purple-600',
+  6: 'bg-green-500 hover:bg-green-600',
+  7: 'bg-indigo-500 hover:bg-indigo-600',
+  8: 'bg-orange-500 hover:bg-orange-600'
 };
 
 module.exports = {
   ROLES,
+  SYSTEM_STATUS,
   CAR_STATUS,
+  REPAIR_STATUS,
   SERVICE_REQUEST_STATUS,
   PAYMENT_STATUS,
   PAYMENT_METHODS,
   STATUS_TRANSLATIONS,
-  CAR_STATUS_COLORS,
-  CAR_STATUS_TAB_COLORS,
-  CAR_STATUS_NAMES
+  STATUS_NAMES,
+  STATUS_COLORS,
+  STATUS_TAB_COLORS
 };

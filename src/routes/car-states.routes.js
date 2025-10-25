@@ -142,25 +142,24 @@ router.post("/accept-budget", async (req, res) => {
       });
     }
 
-    if (
-      req.user.role !== "admin" &&
-      req.user.role !== "cliente" &&
-      req.user.client?.id !== car.clientId
-    ) {
+    const isAdmin = req.user.role?.name
+      ?.toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "") === "admin";
+    const isClient = req.user.role?.name
+      ?.toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "") === "cliente";
+
+    if (!isAdmin && !isClient) {
       return res.status(403).json({
         success: false,
         message:
-          "Acceso denegado. No puedes aceptar presupuestos de otros autos.",
+          "Acceso denegado. Solo administradores y clientes pueden aceptar presupuestos.",
       });
     }
 
-    if (
-      req.user.role?.name
-        ?.toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "") === "cliente" &&
-      req.user.client?.id !== car.clientId
-    ) {
+    if (isClient && req.user.client?.id !== car.clientId) {
       return res.status(403).json({
         success: false,
         message:
@@ -259,25 +258,24 @@ router.post("/reject-budget", async (req, res) => {
       });
     }
 
-    if (
-      req.user.role !== "admin" &&
-      req.user.role !== "cliente" &&
-      req.user.client?.id !== car.clientId
-    ) {
+    const isAdmin = req.user.role?.name
+      ?.toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "") === "admin";
+    const isClient = req.user.role?.name
+      ?.toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "") === "cliente";
+
+    if (!isAdmin && !isClient) {
       return res.status(403).json({
         success: false,
         message:
-          "Acceso denegado. No puedes rechazar presupuestos de otros autos.",
+          "Acceso denegado. Solo administradores y clientes pueden rechazar presupuestos.",
       });
     }
 
-    if (
-      req.user.role?.name
-        ?.toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "") === "cliente" &&
-      req.user.client?.id !== car.clientId
-    ) {
+    if (isClient && req.user.client?.id !== car.clientId) {
       return res.status(403).json({
         success: false,
         message:
@@ -460,14 +458,9 @@ router.post(
         });
       }
 
-      await prisma.car.update({
-        where: { id: parseInt(carId) },
-        data: { statusId: CAR_STATUS.ENTREGADO },
-      });
-
       const updatedCar = await prisma.car.update({
         where: { id: parseInt(carId) },
-        data: { statusId: CAR_STATUS.ENTRADA },
+        data: { statusId: CAR_STATUS.ENTREGADO },
         include: {
           status: true,
           client: {

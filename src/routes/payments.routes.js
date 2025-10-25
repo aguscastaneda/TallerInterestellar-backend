@@ -69,6 +69,152 @@ const generateFallbackEmail = (clientId) => {
   return `client${clientId}@taller-interestellar.com`;
 };
 
+router.get(
+  "/pending/:repairId",
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const { repairId } = req.params;
+
+      const pendingPayment = await prisma.payment.findFirst({
+        where: {
+          repairId: parseInt(repairId),
+          status: "PENDIENTE",
+        },
+        include: {
+          repair: {
+            include: {
+              car: {
+                include: {
+                  client: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!pendingPayment) {
+        return res.json({
+          success: true,
+          data: null,
+          message: "No hay pagos pendientes para esta reparación",
+        });
+      }
+
+      const isAdmin = req.user.role?.name
+        ?.toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "") === "admin";
+      const isClient = req.user.role?.name
+        ?.toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "") === "cliente" &&
+        req.user.client?.id === pendingPayment.clientId;
+
+      if (!isAdmin && !isClient) {
+        return res.status(403).json({
+          success: false,
+          message: "Acceso denegado. No tienes permiso para ver este pago.",
+        });
+      }
+
+      const canCancelAfter = new Date(pendingPayment.createdAt.getTime() + 30 * 60 * 1000);
+      const now = new Date();
+      const canCancelNow = now >= canCancelAfter;
+
+      res.json({
+        success: true,
+        data: {
+          ...pendingPayment,
+          canCancelNow,
+          canCancelAfter,
+          minutesLeft: canCancelNow ? 0 : Math.ceil((canCancelAfter - now) / (1000 * 60)),
+        },
+      });
+    } catch (error) {
+      console.error("Error al obtener pago pendiente:", error);
+      res.status(500).json({
+        success: false,
+        message: "Error interno del servidor",
+      });
+    }
+  }
+);
+
+router.post(
+  "/cancel-pending/:paymentId",
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const { paymentId } = req.params;
+
+      const payment = await prisma.payment.findUnique({
+        where: { id: parseInt(paymentId) },
+        include: {
+          repair: {
+            include: {
+              car: {
+                include: {
+                  client: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!payment) {
+        return res.status(404).json({
+          success: false,
+          message: "Pago no encontrado",
+        });
+      }
+
+      if (payment.status !== "PENDIENTE") {
+        return res.status(400).json({
+          success: false,
+          message: "Solo se pueden cancelar pagos pendientes",
+        });
+      }
+
+      const isAdmin = req.user.role?.name
+        ?.toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "") === "admin";
+      const isClient = req.user.role?.name
+        ?.toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "") === "cliente" &&
+        req.user.client?.id === payment.clientId;
+
+      if (!isAdmin && !isClient) {
+        return res.status(403).json({
+          success: false,
+          message: "Acceso denegado. No tienes permiso para cancelar este pago.",
+        });
+      }
+
+      const updatedPayment = await prisma.payment.update({
+        where: { id: parseInt(paymentId) },
+        data: { status: "CANCELADO" },
+      });
+
+      res.json({
+        success: true,
+        message: "Pago cancelado exitosamente",
+        data: updatedPayment,
+      });
+    } catch (error) {
+      console.error("Error al cancelar pago:", error);
+      res.status(500).json({
+        success: false,
+        message: "Error interno del servidor",
+      });
+    }
+  }
+);
+
 router.post(
   "/create-preference",
   [
@@ -152,10 +298,25 @@ router.post(
       });
 
       if (existingPayment) {
-        return res.status(400).json({
-          success: false,
-          message: "A pending payment already exists for this repair",
-        });
+
+        const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
+        if (existingPayment.createdAt < thirtyMinutesAgo) {
+          await prisma.payment.update({
+            where: { id: existingPayment.id },
+            data: { status: "CANCELADO" },
+          });
+          console.log(`Pago pendiente cancelado automáticamente: ${existingPayment.id}`);
+        } else {
+          return res.status(400).json({
+            success: false,
+            message: "Ya existe un pago pendiente para esta reparación. Por favor, complete o cancele el pago existente antes de crear uno nuevo.",
+            data: {
+              existingPaymentId: existingPayment.id,
+              createdAt: existingPayment.createdAt,
+              canCancelAfter: new Date(existingPayment.createdAt.getTime() + 30 * 60 * 1000),
+            },
+          });
+        }
       }
 
       const user = repair.car.client.user;

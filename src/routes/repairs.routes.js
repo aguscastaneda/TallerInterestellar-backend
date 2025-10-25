@@ -24,6 +24,165 @@ const handleValidationErrors = (req, res, next) => {
 };
 
 router.get(
+  "/all-cars",
+  requireRole("admin", "mecanico", "jefe"),
+  async (req, res) => {
+    try {
+      const { search } = req.query;
+
+      const cars = await prisma.car.findMany({
+        include: {
+          client: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  lastName: true,
+                  email: true,
+                  phone: true,
+                  cuil: true,
+                  createdAt: true,
+                },
+              },
+            },
+          },
+          status: true,
+          mechanic: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  lastName: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+      });
+
+      let filteredCars = cars;
+      if (search && search.trim()) {
+        const searchTerm = search.trim().toLowerCase();
+        filteredCars = cars.filter((car) =>
+          car.licensePlate.toLowerCase().includes(searchTerm) ||
+          car.brand.toLowerCase().includes(searchTerm) ||
+          car.model.toLowerCase().includes(searchTerm) ||
+          car.client?.user?.name?.toLowerCase().includes(searchTerm) ||
+          car.client?.user?.lastName?.toLowerCase().includes(searchTerm)
+        );
+      }
+
+      const allItems = filteredCars.map((car) => ({
+        ...car,
+        type: "car",
+        description: "Vehículo en el sistema",
+        cost: 0,
+        warranty: 0,
+        mechanic: car.mechanic,
+        mechanicId: car.mechanicId,
+      }));
+
+      res.json({
+        success: true,
+        data: allItems,
+      });
+    } catch (error) {
+      console.error("Error cargando autos:", error);
+      res.status(500).json({
+        success: false,
+        message: "Error interno del servidor",
+      });
+    }
+  }
+);
+
+router.get(
+  "/all-repairs",
+  requireRole("admin", "mecanico", "jefe"),
+  async (req, res) => {
+    try {
+      const { search } = req.query;
+
+      const repairs = await prisma.repair.findMany({
+        include: {
+          car: {
+            include: {
+              client: {
+                include: {
+                  user: {
+                    select: {
+                      id: true,
+                      name: true,
+                      lastName: true,
+                      email: true,
+                      phone: true,
+                      cuil: true,
+                      createdAt: true,
+                    },
+                  },
+                },
+              },
+              status: true,
+            },
+          },
+          mechanic: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  lastName: true,
+                },
+              },
+            },
+          },
+          status: true,
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+      });
+
+      let filteredRepairs = repairs;
+      if (search && search.trim()) {
+        const searchTerm = search.trim().toLowerCase();
+        filteredRepairs = repairs.filter((repair) =>
+          repair.car?.licensePlate?.toLowerCase().includes(searchTerm) ||
+          repair.car?.brand?.toLowerCase().includes(searchTerm) ||
+          repair.car?.model?.toLowerCase().includes(searchTerm) ||
+          repair.car?.client?.user?.name?.toLowerCase().includes(searchTerm) ||
+          repair.car?.client?.user?.lastName?.toLowerCase().includes(searchTerm) ||
+          repair.mechanic?.user?.name?.toLowerCase().includes(searchTerm) ||
+          repair.mechanic?.user?.lastName?.toLowerCase().includes(searchTerm) ||
+          repair.description?.toLowerCase().includes(searchTerm)
+        );
+      }
+
+      const allItems = filteredRepairs.map((repair) => ({
+        ...repair,
+        type: "repair",
+      }));
+
+      res.json({
+        success: true,
+        data: allItems,
+      });
+    } catch (error) {
+      console.error("Error cargando reparaciones:", error);
+      res.status(500).json({
+        success: false,
+        message: "Error interno del servidor",
+      });
+    }
+  }
+);
+
+router.get(
   "/all-items",
   requireRole("admin", "mecanico", "jefe"),
   async (req, res) => {
@@ -445,13 +604,14 @@ router.put(
     body("description").optional().trim(),
     body("cost").optional().isFloat({ min: 0 }),
     body("warranty").optional().isInt({ min: 0 }),
-    body("statusId").optional().isInt({ min: 1 }),
+    body("statusId").optional().isInt({ min: 1, max: 8 }),
     handleValidationErrors,
   ],
   async (req, res) => {
     try {
       const { id } = req.params;
       const updateData = req.body;
+
 
       const existingRepair = await prisma.repair.findUnique({
         where: { id: parseInt(id) },
@@ -489,6 +649,25 @@ router.put(
 
       if (updateData.hasOwnProperty("statusId")) {
         updateData.statusId = parseInt(updateData.statusId);
+
+
+        if (isNaN(updateData.statusId) || updateData.statusId < 1 || updateData.statusId > 8) {
+          return res.status(400).json({
+            success: false,
+            message: "El statusId debe ser un número entero entre 1 y 8",
+          });
+        }
+
+        const statusExists = await prisma.carStatus.findUnique({
+          where: { id: updateData.statusId }
+        });
+
+        if (!statusExists) {
+          return res.status(400).json({
+            success: false,
+            message: "El estado especificado no existe",
+          });
+        }
       }
 
       const updatedRepair = await prisma.repair.update({
@@ -526,6 +705,7 @@ router.put(
           },
         },
       });
+
 
       res.json({
         success: true,

@@ -743,7 +743,7 @@ router.get("/role/:roleId", requireRole("admin"), async (req, res) => {
 
 router.get(
   "/mechanics/list",
-  requireRole("admin", "jefe", "recepcionista"),
+  requireRole("admin", "jefe", "recepcionista", "cliente"),
   async (req, res) => {
     try {
       const mechanics = await prisma.mechanic.findMany({

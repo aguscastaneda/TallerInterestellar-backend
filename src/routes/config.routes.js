@@ -1,6 +1,7 @@
 const express = require('express');
 const { PrismaClient } = require('@prisma/client');
-const { ROLES, CAR_STATUS, SERVICE_REQUEST_STATUS, PAYMENT_STATUS, PAYMENT_METHODS, STATUS_TRANSLATIONS, CAR_STATUS_COLORS, CAR_STATUS_TAB_COLORS } = require('../constants');
+const { ROLES, SYSTEM_STATUS, SERVICE_REQUEST_STATUS, PAYMENT_STATUS, PAYMENT_METHODS, STATUS_TRANSLATIONS, STATUS_COLORS, STATUS_TAB_COLORS, STATUS_NAMES } = require('../constants');
+const { getAllCategories } = require('../constants/repairCategories');
 
 const { authenticateToken, requireRole } = require('../middlewares/authMiddleware');
 
@@ -16,15 +17,12 @@ router.get('/system', async (req, res) => {
     });
 
 
-    const carStatuses = await prisma.carStatus.findMany({
-      orderBy: { id: 'asc' }
-    });
 
-
-    const carStatusesWithColors = carStatuses.map(status => ({
-      ...status,
-      color: CAR_STATUS_COLORS[status.id] || 'bg-gray-100 text-gray-800',
-      tabColor: CAR_STATUS_TAB_COLORS[status.id] || 'bg-gray-500 hover:bg-gray-600'
+    const carStatuses = Object.entries(SYSTEM_STATUS).map(([key, id]) => ({
+      id,
+      name: STATUS_NAMES[id],
+      color: STATUS_COLORS[id] || 'bg-gray-100 text-gray-800',
+      tabColor: STATUS_TAB_COLORS[id] || 'bg-gray-500 hover:bg-gray-600'
     }));
 
 
@@ -52,17 +50,18 @@ router.get('/system', async (req, res) => {
       success: true,
       data: {
         roles,
-        carStatuses: carStatusesWithColors,
+        carStatuses,
         serviceRequestStatuses,
         paymentStatuses,
         paymentMethods,
         constants: {
           ROLES,
-          CAR_STATUS,
+          SYSTEM_STATUS,
           SERVICE_REQUEST_STATUS,
           PAYMENT_STATUS,
           PAYMENT_METHODS
-        }
+        },
+        repairCategories: getAllCategories()
       }
     });
 
@@ -105,8 +104,8 @@ router.get('/car-statuses', async (req, res) => {
 
     const carStatusesWithColors = carStatuses.map(status => ({
       ...status,
-      color: CAR_STATUS_COLORS[status.id] || 'bg-gray-100 text-gray-800',
-      tabColor: CAR_STATUS_TAB_COLORS[status.id] || 'bg-gray-500 hover:bg-gray-600'
+      color: STATUS_COLORS[status.id] || 'bg-gray-100 text-gray-800',
+      tabColor: STATUS_TAB_COLORS[status.id] || 'bg-gray-500 hover:bg-gray-600'
     }));
 
     res.json({
