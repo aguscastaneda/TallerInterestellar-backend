@@ -142,14 +142,16 @@ router.post("/accept-budget", async (req, res) => {
       });
     }
 
-    const isAdmin = req.user.role?.name
-      ?.toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "") === "admin";
-    const isClient = req.user.role?.name
-      ?.toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "") === "cliente";
+    const isAdmin =
+      req.user.role?.name
+        ?.toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "") === "admin";
+    const isClient =
+      req.user.role?.name
+        ?.toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "") === "cliente";
 
     if (!isAdmin && !isClient) {
       return res.status(403).json({
@@ -258,14 +260,16 @@ router.post("/reject-budget", async (req, res) => {
       });
     }
 
-    const isAdmin = req.user.role?.name
-      ?.toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "") === "admin";
-    const isClient = req.user.role?.name
-      ?.toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "") === "cliente";
+    const isAdmin =
+      req.user.role?.name
+        ?.toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "") === "admin";
+    const isClient =
+      req.user.role?.name
+        ?.toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "") === "cliente";
 
     if (!isAdmin && !isClient) {
       return res.status(403).json({

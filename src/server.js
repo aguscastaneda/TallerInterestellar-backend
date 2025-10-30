@@ -15,6 +15,7 @@ const carStatesRoutes = require('./routes/car-states.routes');
 const clientRepairsRoutes = require('./routes/client-repairs.routes');
 const configRoutes = require('./routes/config.routes');
 const emailRoutes = require('./routes/email.routes');
+const analyticsRoutes = require('./routes/analytics.routes');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -43,6 +44,7 @@ app.use('/api/car-states', authenticateToken, carStatesRoutes);
 app.use('/api/client-repairs', authenticateToken, clientRepairsRoutes);
 app.use('/api/config', authenticateToken, configRoutes);
 app.use('/api/email', authenticateToken, emailRoutes);
+app.use('/api/analytics', authenticateToken, analyticsRoutes);
 
 app.use('*', (req, res) => {
   res.status(404).json({
