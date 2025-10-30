@@ -2,6 +2,7 @@ const express = require('express');
 const { body, validationResult } = require('express-validator');
 const { PrismaClient } = require('@prisma/client');
 const emailService = require('../services/emailService');
+const { enqueueEmail } = require('../queues/emailQueue');
 
 const { authenticateToken, requireRole } = require('../middlewares/authMiddleware');
 
@@ -27,26 +28,13 @@ router.post('/test', requireRole('admin'), [
   try {
     const { email } = req.body;
 
-    console.log('Sending test email to:', email);
-
-    const result = await emailService.sendTestEmail(email);
-
-    if (result.success) {
-      res.json({
-        success: true,
-        message: 'Test email sent successfully',
-        data: {
-          messageId: result.messageId,
-          email: email
-        }
-      });
-    } else {
-      res.status(500).json({
-        success: false,
-        message: 'Failed to send test email',
-        error: result.error
-      });
-    }
+    console.log('Enqueuing test email to:', email);
+    await enqueueEmail({ type: 'testEmail', payload: { email } });
+    res.json({
+      success: true,
+      message: 'Test email enqueued',
+      data: { email }
+    });
 
   } catch (error) {
     console.error('Error in test email route:', error);
@@ -76,27 +64,16 @@ router.post('/registration-confirmation', requireRole('admin'), [
       second: '2-digit'
     });
 
-    console.log('Sending registration confirmation to:', email);
-
-    const result = await emailService.sendRegistrationConfirmation(email, name, loginDateTime);
-
-    if (result.success) {
-      res.json({
-        success: true,
-        message: 'Registration confirmation email sent successfully',
-        data: {
-          messageId: result.messageId,
-          email: email,
-          sentAt: loginDateTime
-        }
-      });
-    } else {
-      res.status(500).json({
-        success: false,
-        message: 'Failed to send registration confirmation email',
-        error: result.error
-      });
-    }
+    console.log('Enqueuing registration confirmation to:', email);
+    await enqueueEmail({
+      type: 'registrationConfirmation',
+      payload: { email, name, loginDateTime }
+    });
+    res.json({
+      success: true,
+      message: 'Registration confirmation email enqueued',
+      data: { email, queuedAt: new Date().toISOString() }
+    });
 
   } catch (error) {
     console.error('Error in registration confirmation email route:', error);
@@ -167,12 +144,11 @@ router.post('/test-car-state-change', requireRole('admin'), async (req, res) => 
       }
     };
 
-    const result = await emailService.sendCarStateChangeNotification(testCar);
-
+    await enqueueEmail({ type: 'carStateChange', payload: { carData: testCar } });
     res.json({
       success: true,
-      message: 'Email de prueba enviado',
-      data: result
+      message: 'Email de prueba encolado',
+      data: { carId: car.id }
     });
 
   } catch (error) {

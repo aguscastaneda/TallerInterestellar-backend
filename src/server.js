@@ -16,6 +16,8 @@ const clientRepairsRoutes = require('./routes/client-repairs.routes');
 const configRoutes = require('./routes/config.routes');
 const emailRoutes = require('./routes/email.routes');
 const analyticsRoutes = require('./routes/analytics.routes');
+const { getRedis, disconnectRedis } = require('./lib/redis');
+const { getChannel, closeRabbit } = require('./lib/rabbitmq');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -31,6 +33,26 @@ app.get('/api/health', (req, res) => {
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development'
   });
+});
+
+app.get('/api/health/redis', async (req, res) => {
+  try {
+    const client = await getRedis();
+    await client.ping();
+    res.json({ success: true, status: 'ok' });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.get('/api/health/queue', async (req, res) => {
+  try {
+    const ch = await getChannel();
+    await ch.checkQueue(process.env.EMAIL_QUEUE_NAME || 'email_queue');
+    res.json({ success: true, status: 'ok' });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
 });
 
 app.use('/api/auth', authRoutes);
@@ -71,12 +93,16 @@ const startServer = async () => {
 process.on('SIGTERM', async () => {
   console.log('Señal SIGTERM recibida. Cerrando servidor...');
   await prisma.$disconnect();
+  await disconnectRedis().catch(() => {});
+  await closeRabbit().catch(() => {});
   process.exit(0);
 });
 
 process.on('SIGINT', async () => {
   console.log('Señal SIGINT recibida. Cerrando servidor...');
   await prisma.$disconnect();
+  await disconnectRedis().catch(() => {});
+  await closeRabbit().catch(() => {});
   process.exit(0);
 });
 

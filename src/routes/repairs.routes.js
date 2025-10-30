@@ -9,6 +9,7 @@ const {
 } = require("../middlewares/authMiddleware");
 
 const router = express.Router();
+const { cacheGet, invalidateNamespace } = require('../middlewares/cacheMiddleware');
 const prisma = new PrismaClient();
 
 const handleValidationErrors = (req, res, next) => {
@@ -26,6 +27,7 @@ const handleValidationErrors = (req, res, next) => {
 router.get(
   "/all-cars",
   requireRole("admin", "mecanico", "jefe"),
+  cacheGet('repairs'),
   async (req, res) => {
     try {
       const { search } = req.query;
@@ -104,6 +106,7 @@ router.get(
 router.get(
   "/all-repairs",
   requireRole("admin", "mecanico", "jefe"),
+  cacheGet('repairs'),
   async (req, res) => {
     try {
       const { search } = req.query;
@@ -185,6 +188,7 @@ router.get(
 router.get(
   "/all-items",
   requireRole("admin", "mecanico", "jefe"),
+  cacheGet('repairs'),
   async (req, res) => {
     try {
       const { search } = req.query;
@@ -316,7 +320,7 @@ router.get(
   }
 );
 
-router.get("/", requireRole("admin", "mecanico", "jefe"), async (req, res) => {
+router.get("/", requireRole("admin", "mecanico", "jefe"), cacheGet('repairs'), async (req, res) => {
   try {
     const repairs = await prisma.repair.findMany({
       include: {
@@ -587,6 +591,8 @@ router.post(
         message: "Reparación creada exitosamente",
         data: repair,
       });
+      // invalidate caches that depend on repairs listings
+      try { await invalidateNamespace('repairs'); } catch (_) {}
     } catch (error) {
       console.error("Error al crear reparación:", error);
       res.status(500).json({
@@ -712,6 +718,7 @@ router.put(
         message: "Reparación actualizada exitosamente",
         data: updatedRepair,
       });
+      try { await invalidateNamespace('repairs'); } catch (_) {}
     } catch (error) {
       console.error("Error al actualizar reparación:", error);
       res.status(500).json({
@@ -757,6 +764,7 @@ router.delete("/:id", requireRole("admin"), async (req, res) => {
       success: true,
       message: "Reparación eliminada exitosamente",
     });
+    try { await invalidateNamespace('repairs'); } catch (_) {}
   } catch (error) {
     console.error("Error al eliminar reparación:", error);
     res.status(500).json({
@@ -766,7 +774,7 @@ router.delete("/:id", requireRole("admin"), async (req, res) => {
   }
 });
 
-router.get("/car/:carId", async (req, res) => {
+router.get("/car/:carId", cacheGet('repairs'), async (req, res) => {
   try {
     const { carId } = req.params;
 
@@ -844,7 +852,7 @@ router.get("/car/:carId", async (req, res) => {
   }
 });
 
-router.get("/mechanic/:mechanicId", async (req, res) => {
+router.get("/mechanic/:mechanicId", cacheGet('repairs'), async (req, res) => {
   try {
     const { mechanicId } = req.params;
 

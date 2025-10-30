@@ -5,7 +5,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { PrismaClient } = require('@prisma/client');
 const { ROLES } = require('../constants');
-const emailService = require('../services/emailService');
+const { enqueueEmail } = require('../queues/emailQueue');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -110,14 +110,17 @@ router.post('/register', [
     );
 
     try {
-      await emailService.sendWelcomeEmail(
-        user.email,
-        `${user.name} ${user.lastName}`,
-        user.role.name
-      );
-      console.log('Welcome email sent to:', user.email);
+      await enqueueEmail({
+        type: 'welcomeEmail',
+        payload: {
+          email: user.email,
+          name: `${user.name} ${user.lastName}`,
+          roleName: user.role.name
+        }
+      });
+      console.log('Welcome email enqueued for:', user.email);
     } catch (emailError) {
-      console.error('Failed to send welcome email:', emailError.message);
+      console.error('Failed to enqueue welcome email:', emailError.message);
     }
 
     res.status(201).json({
@@ -197,14 +200,17 @@ router.post('/login', [
         second: '2-digit'
       });
 
-      await emailService.sendRegistrationConfirmation(
-        user.email,
-        `${user.name} ${user.lastName}`,
-        loginDateTime
-      );
-      console.log('Login confirmation email sent to:', user.email);
+      await enqueueEmail({
+        type: 'registrationConfirmation',
+        payload: {
+          email: user.email,
+          name: `${user.name} ${user.lastName}`,
+          loginDateTime
+        }
+      });
+      console.log('Login confirmation email enqueued for:', user.email);
     } catch (emailError) {
-      console.error('Failed to send login confirmation email:', emailError.message);
+      console.error('Failed to enqueue login confirmation email:', emailError.message);
     }
 
     res.json({
@@ -314,14 +320,17 @@ router.post('/forgot-password', [
     }
 
     try {
-      await emailService.sendPasswordResetEmail(
-        user.email,
-        `${user.name} ${user.lastName}`,
-        resetToken
-      );
-      console.log('Password reset email sent to:', user.email);
+      await enqueueEmail({
+        type: 'passwordReset',
+        payload: {
+          email: user.email,
+          name: `${user.name} ${user.lastName}`,
+          token: resetToken
+        }
+      });
+      console.log('Password reset email enqueued for:', user.email);
     } catch (emailError) {
-      console.error('⚠️  Failed to send password reset email:', emailError.message);
+      console.error('⚠️  Failed to enqueue password reset email:', emailError.message);
     }
 
     res.json({
