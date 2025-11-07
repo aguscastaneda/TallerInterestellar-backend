@@ -5,11 +5,12 @@ const {
   authenticateToken,
   requireRole,
 } = require("../middlewares/authMiddleware");
+const { cacheGet } = require("../middlewares/cacheMiddleware");
 
 const router = express.Router();
 const prisma = new PrismaClient();
 
-router.get("/:clientId", async (req, res) => {
+router.get("/:clientId", cacheGet("client-repairs"), async (req, res) => {
   try {
     const { clientId } = req.params;
 

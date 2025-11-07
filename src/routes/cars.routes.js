@@ -9,6 +9,7 @@ const {
   authenticateToken,
   requireRole,
 } = require("../middlewares/authMiddleware");
+const { cacheGet } = require("../middlewares/cacheMiddleware");
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -25,7 +26,7 @@ const handleValidationErrors = (req, res, next) => {
   next();
 };
 
-router.get("/", requireRole("admin", "recepcionista"), async (req, res) => {
+router.get("/", requireRole("admin", "recepcionista"), cacheGet("cars"), async (req, res) => {
   try {
     const cars = await prisma.car.findMany({
       include: {
@@ -124,7 +125,7 @@ router.get(
   }
 );
 
-router.get("/client/:clientId", async (req, res) => {
+router.get("/client/:clientId", cacheGet("cars"), async (req, res) => {
   try {
     const { clientId } = req.params;
 

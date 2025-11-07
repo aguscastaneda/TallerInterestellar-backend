@@ -8,6 +8,7 @@ const {
   authenticateToken,
   requireRole,
 } = require("../middlewares/authMiddleware");
+const { cacheGet } = require("../middlewares/cacheMiddleware");
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -180,7 +181,7 @@ router.post(
   }
 );
 
-router.get("/", requireRole("admin"), async (req, res) => {
+router.get("/", requireRole("admin"), cacheGet("users"), async (req, res) => {
   try {
     const users = await prisma.user.findMany({
       select: {
@@ -744,6 +745,7 @@ router.get("/role/:roleId", requireRole("admin"), async (req, res) => {
 router.get(
   "/mechanics/list",
   requireRole("admin", "jefe", "recepcionista", "cliente"),
+  cacheGet("mechanics"),
   async (req, res) => {
     try {
       const mechanics = await prisma.mechanic.findMany({
@@ -791,6 +793,7 @@ router.get(
 router.get(
   "/bosses/list",
   requireRole("admin", "recepcionista"),
+  cacheGet("bosses"),
   async (req, res) => {
     try {
       const bosses = await prisma.boss.findMany({

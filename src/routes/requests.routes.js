@@ -8,6 +8,7 @@ const {
   authenticateToken,
   requireRole,
 } = require("../middlewares/authMiddleware");
+const { cacheGet } = require("../middlewares/cacheMiddleware");
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -154,7 +155,7 @@ router.post(
   }
 );
 
-router.get("/boss/:bossId", async (req, res) => {
+router.get("/boss/:bossId", cacheGet("requests"), async (req, res) => {
   try {
     const { bossId } = req.params;
 
@@ -712,7 +713,7 @@ router.post("/:id/cancel", async (req, res) => {
   }
 });
 
-router.get("/mechanic/:mechanicId", async (req, res) => {
+router.get("/mechanic/:mechanicId", cacheGet("requests"), async (req, res) => {
   try {
     const { mechanicId } = req.params;
 
