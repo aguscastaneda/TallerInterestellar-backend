@@ -40,21 +40,17 @@ if (process.env.FRONTEND_URL) {
 }
 
 app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin) {
-      return callback(null, true);
-    }
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
 
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
+    if (allowedOrigins.includes(origin)) return callback(null, true);
 
-    console.warn(`Origen no permitido por CORS: ${origin}`);
+    if (origin.endsWith('.vercel.app')) return callback(null, true);
+
+    console.error(`Origen no permitido por CORS: ${origin}`);
     return callback(new Error('No permitido por CORS'));
   },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  credentials: true
 }));
 
 app.use(express.json());
