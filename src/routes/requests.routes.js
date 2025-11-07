@@ -664,14 +664,9 @@ router.post("/:id/cancel", async (req, res) => {
       data: { status: SERVICE_REQUEST_STATUS.CANCELLED },
     });
 
-    await prisma.car.update({
-      where: { id: request.carId },
-      data: { statusId: CAR_STATUS.CANCELADO },
-    });
-
     const updatedCar = await prisma.car.update({
       where: { id: request.carId },
-      data: { statusId: CAR_STATUS.ENTRADA },
+      data: { statusId: CAR_STATUS.CANCELADO },
       include: {
         status: true,
         client: {
@@ -688,9 +683,25 @@ router.post("/:id/cancel", async (req, res) => {
       console.error("Error sending cancellation email:", emailError);
     }
 
+    const carIdForTimeout = request.carId;
+    console.log(`Programando cambio a ENTRADA para auto ${carIdForTimeout} en 15 segundos (estado actual: CANCELADO)`);
+
+    setTimeout(async () => {
+      try {
+        console.log(`Ejecutando cambio a ENTRADA para auto ${carIdForTimeout}`);
+        const result = await prisma.car.update({
+          where: { id: carIdForTimeout },
+          data: { statusId: CAR_STATUS.ENTRADA },
+        });
+        console.log(`Auto ${carIdForTimeout} vuelto automáticamente a ENTRADA después de estar CANCELADO. Estado actual: ${result.statusId}`);
+      } catch (error) {
+        console.error(`Error al volver auto ${carIdForTimeout} a ENTRADA:`, error);
+      }
+    }, 15000);
+
     res.json({
       success: true,
-      message: "Solicitud cancelada exitosamente",
+      message: "Solicitud cancelada exitosamente. El auto volverá a entrada en 15 segundos",
       data: { request: updatedRequest, car: updatedCar },
     });
   } catch (error) {

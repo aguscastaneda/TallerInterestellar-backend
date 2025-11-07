@@ -55,10 +55,15 @@ router.post(
         });
       }
 
+
+      const finalStatusId = parseInt(newStatusId);
+      const terminalStatuses = [CAR_STATUS.ENTREGADO, CAR_STATUS.RECHAZADO, CAR_STATUS.CANCELADO];
+      const isTerminalStatus = terminalStatuses.includes(finalStatusId);
+
       const updatedCar = await prisma.car.update({
         where: { id: parseInt(carId) },
         data: {
-          statusId: parseInt(newStatusId),
+          statusId: finalStatusId,
           description: description || car.description,
         },
         include: {
@@ -85,9 +90,32 @@ router.post(
         console.error("Error sending state change email:", emailError);
       }
 
+      if (isTerminalStatus) {
+        const carIdForTimeout = parseInt(carId);
+        const terminalStatusForLog = finalStatusId;
+        console.log(`Programando cambio a ENTRADA para auto ${carIdForTimeout} en 15 segundos (estado actual: ${terminalStatusForLog})`);
+
+        setTimeout(async () => {
+          try {
+            console.log(`Ejecutando cambio a ENTRADA para auto ${carIdForTimeout}`);
+            const result = await prisma.car.update({
+              where: { id: carIdForTimeout },
+              data: { statusId: CAR_STATUS.ENTRADA },
+            });
+            console.log(`Auto ${carIdForTimeout} vuelto automáticamente a ENTRADA después de estar en estado terminal (${terminalStatusForLog}). Estado actual: ${result.statusId}`);
+          } catch (error) {
+            console.error(`Error al volver auto ${carIdForTimeout} a ENTRADA:`, error);
+          }
+        }, 15000);
+      }
+
+      const statusMessage = isTerminalStatus
+        ? `Estado cambiado a ${newStatus.name}. El auto volverá automáticamente a Entrada en 15 segundos`
+        : `Estado cambiado a ${updatedCar.status.name}`;
+
       res.json({
         success: true,
-        message: `Estado cambiado a ${newStatus.name}`,
+        message: statusMessage,
         data: updatedCar,
       });
     } catch (error) {
@@ -310,14 +338,10 @@ router.post("/reject-budget", async (req, res) => {
       data: { status: SERVICE_REQUEST_STATUS.REJECTED },
     });
 
-    await prisma.car.update({
-      where: { id: parseInt(carId) },
-      data: { statusId: CAR_STATUS.RECHAZADO },
-    });
 
     const updatedCar = await prisma.car.update({
       where: { id: parseInt(carId) },
-      data: { statusId: CAR_STATUS.ENTRADA },
+      data: { statusId: CAR_STATUS.RECHAZADO },
       include: {
         status: true,
         client: {
@@ -334,9 +358,25 @@ router.post("/reject-budget", async (req, res) => {
       console.error("Error sending budget rejected email:", emailError);
     }
 
+    const carIdForTimeout = parseInt(carId);
+    console.log(`Programando cambio a ENTRADA para auto ${carIdForTimeout} en 15 segundos (estado actual: RECHAZADO)`);
+
+    setTimeout(async () => {
+      try {
+        console.log(`Ejecutando cambio a ENTRADA para auto ${carIdForTimeout}`);
+        const result = await prisma.car.update({
+          where: { id: carIdForTimeout },
+          data: { statusId: CAR_STATUS.ENTRADA },
+        });
+        console.log(`Auto ${carIdForTimeout} vuelto automáticamente a ENTRADA después de estar RECHAZADO. Estado actual: ${result.statusId}`);
+      } catch (error) {
+        console.error(`Error al volver auto ${carIdForTimeout} a ENTRADA:`, error);
+      }
+    }, 15000);
+
     res.json({
       success: true,
-      message: "Presupuesto rechazado, auto vuelve a entrada",
+      message: "Presupuesto rechazado. El auto volverá a entrada en 15 segundos",
       data: updatedCar,
     });
   } catch (error) {
@@ -461,7 +501,6 @@ router.post(
           message: "Acceso denegado. No tienes permiso para entregar autos.",
         });
       }
-
       const updatedCar = await prisma.car.update({
         where: { id: parseInt(carId) },
         data: { statusId: CAR_STATUS.ENTREGADO },
@@ -481,9 +520,25 @@ router.post(
         console.error("Error sending car delivered email:", emailError);
       }
 
+      const carIdForTimeout = parseInt(carId);
+      console.log(`Programando cambio a ENTRADA para auto ${carIdForTimeout} en 15 segundos (estado actual: ENTREGADO)`);
+
+      setTimeout(async () => {
+        try {
+          console.log(`Ejecutando cambio a ENTRADA para auto ${carIdForTimeout}`);
+          const result = await prisma.car.update({
+            where: { id: carIdForTimeout },
+            data: { statusId: CAR_STATUS.ENTRADA },
+          });
+          console.log(`Auto ${carIdForTimeout} vuelto automáticamente a ENTRADA después de estar ENTREGADO. Estado actual: ${result.statusId}`);
+        } catch (error) {
+          console.error(`Error al volver auto ${carIdForTimeout} a ENTRADA:`, error);
+        }
+      }, 15000);
+
       res.json({
         success: true,
-        message: "Auto entregado exitosamente",
+        message: "Auto entregado exitosamente. Volverá a entrada en 15 segundos",
         data: updatedCar,
       });
     } catch (error) {

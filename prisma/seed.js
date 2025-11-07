@@ -37,7 +37,8 @@ async function main() {
   console.log('Roles creados:', roles.map(r => r.name));
 
   console.log('Creando estados de auto...');
-  
+
+
   const carStatuses = await Promise.all([
     prisma.carStatus.upsert({
       where: { id: 1 },
@@ -136,7 +137,8 @@ async function main() {
 
   console.log('Creando usuarios mecánicos...');
   const mechanicPassword = await bcrypt.hash('mecanico123', 12);
-  
+
+
   const mechanic1User = await prisma.user.upsert({
     where: { email: 'mecanico1@taller.com' },
     update: {},
@@ -188,7 +190,8 @@ async function main() {
 
   console.log('Creando usuarios clientes...');
   const clientPassword = await bcrypt.hash('cliente123', 12);
-  
+
+
   const client1User = await prisma.user.upsert({
     where: { email: 'cliente1@email.com' },
     update: {},
@@ -272,11 +275,10 @@ async function main() {
       licensePlate: 'ABC123',
       brand: 'Toyota',
       model: 'Corolla',
+      year: 2020,
       kms: 45000,
       chassis: '1HGBH41JXMN109186',
-      description: 'Auto en buen estado',
       statusId: 1,
-      priority: 1
     }
   });
 
@@ -288,11 +290,10 @@ async function main() {
       licensePlate: 'XYZ789',
       brand: 'Ford',
       model: 'Focus',
+      year: 2018,
       kms: 60000,
       chassis: '2T1BURHE0JC123456',
-      description: 'Necesita revisión de frenos',
       statusId: 2,
-      priority: 2,
       mechanicId: mechanic1.id
     }
   });
@@ -303,6 +304,7 @@ async function main() {
     data: {
       carId: car2.id,
       mechanicId: mechanic1.id,
+      statusId: 5,
       description: 'Revisión y cambio de pastillas de freno',
       cost: 150.00,
       warranty: 90
@@ -335,7 +337,7 @@ async function main() {
 
 main()
   .catch((e) => {
-      console.error('Error durante el seed:', e);
+    console.error('Error durante el seed:', e);
     process.exit(1);
   })
   .finally(async () => {

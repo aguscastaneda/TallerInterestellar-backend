@@ -39,8 +39,19 @@ try {
   isConfigured = false;
 }
 
+// Función para normalizar la URL del frontend (quitar www si existe)
+const normalizeFrontendUrl = (url) => {
+  if (!url) return "http://localhost:5173";
+  let normalized = url.trim().replace(/\/$/, '');
+  // Si es producción y tiene www, quitarlo para usar siempre la URL sin www
+  if (normalized.includes('www.tallerinterestellar.com.ar')) {
+    normalized = normalized.replace(/www\.tallerinterestellar\.com\.ar/g, 'tallerinterestellar.com.ar');
+  }
+  return normalized;
+};
+
 const config = {
-  frontendUrl: process.env.FRONTEND_URL || "http://localhost:5173",
+  frontendUrl: normalizeFrontendUrl(process.env.FRONTEND_URL) || "http://localhost:5173",
   backendUrl: process.env.BACKEND_URL || "http://localhost:3001",
   isProduction: process.env.NODE_ENV === "production",
 };

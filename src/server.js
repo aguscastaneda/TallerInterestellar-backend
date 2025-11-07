@@ -23,7 +23,43 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 const prisma = new PrismaClient();
 
-app.use(cors());
+const allowedOrigins = [
+  'https://www.tallerinterestellar.com.ar',
+  'https://tallerinterestellar.com.ar',
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:3000'
+];
+
+if (process.env.FRONTEND_URL) {
+  const frontendUrl = process.env.FRONTEND_URL.trim();
+  if (!allowedOrigins.includes(frontendUrl)) {
+    allowedOrigins.push(frontendUrl);
+  }
+}
+
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin) {
+      if (process.env.NODE_ENV !== 'production') {
+        return callback(null, true);
+      }
+      return callback(new Error('No permitido por CORS: origen no especificado en producción'));
+    }
+
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.warn(`Origen no permitido por CORS: ${origin}`);
+      callback(new Error('No permitido por CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+}));
+
 app.use(express.json());
 
 app.get('/api/health', (req, res) => {
@@ -75,6 +111,54 @@ app.use('*', (req, res) => {
   });
 });
 
+const checkTerminalStatusCars = async () => {
+  try {
+    const { CAR_STATUS } = require('./constants');
+    const terminalStatuses = [CAR_STATUS.ENTREGADO, CAR_STATUS.RECHAZADO, CAR_STATUS.CANCELADO];
+
+    const carsInTerminalStatus = await prisma.car.findMany({
+      where: {
+        statusId: { in: terminalStatuses }
+      },
+      select: {
+        id: true,
+        statusId: true,
+        updatedAt: true
+      }
+    });
+
+    if (carsInTerminalStatus.length > 0) {
+      const now = new Date();
+      const carsToUpdate = [];
+
+      for (const car of carsInTerminalStatus) {
+        const timeInTerminalStatus = now.getTime() - car.updatedAt.getTime();
+        if (timeInTerminalStatus >= 15000) {
+          carsToUpdate.push(car);
+        }
+      }
+
+      if (carsToUpdate.length > 0) {
+        console.log(`Encontrados ${carsToUpdate.length} autos en estado terminal que deben volver a ENTRADA`);
+
+        for (const car of carsToUpdate) {
+          try {
+            const result = await prisma.car.update({
+              where: { id: car.id },
+              data: { statusId: CAR_STATUS.ENTRADA }
+            });
+            console.log(`Auto ${car.id} actualizado de estado ${car.statusId} a ENTRADA (verificación periódica). Tiempo en estado terminal: ${Math.floor((now.getTime() - car.updatedAt.getTime()) / 1000)}s`);
+          } catch (error) {
+            console.error(`Error al actualizar auto ${car.id} en verificación periódica:`, error);
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error en verificación periódica de estados terminales:', error);
+  }
+};
+
 const startServer = async () => {
   try {
     await prisma.$connect();
@@ -83,6 +167,14 @@ const startServer = async () => {
     app.listen(PORT, () => {
       console.log(`Servidor corriendo en puerto ${PORT}`);
     });
+
+    setInterval(() => {
+      checkTerminalStatusCars();
+    }, 10000);
+
+    setTimeout(() => {
+      checkTerminalStatusCars();
+    }, 5000);
 
   } catch (error) {
     console.error('Error al iniciar el servidor:', error);
@@ -93,16 +185,16 @@ const startServer = async () => {
 process.on('SIGTERM', async () => {
   console.log('Señal SIGTERM recibida. Cerrando servidor...');
   await prisma.$disconnect();
-  await disconnectRedis().catch(() => {});
-  await closeRabbit().catch(() => {});
+  await disconnectRedis().catch(() => { });
+  await closeRabbit().catch(() => { });
   process.exit(0);
 });
 
 process.on('SIGINT', async () => {
   console.log('Señal SIGINT recibida. Cerrando servidor...');
   await prisma.$disconnect();
-  await disconnectRedis().catch(() => {});
-  await closeRabbit().catch(() => {});
+  await disconnectRedis().catch(() => { });
+  await closeRabbit().catch(() => { });
   process.exit(0);
 });
 

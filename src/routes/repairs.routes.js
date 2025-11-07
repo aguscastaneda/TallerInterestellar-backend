@@ -1,7 +1,7 @@
 const express = require("express");
 const { body, validationResult } = require("express-validator");
 const { PrismaClient } = require("@prisma/client");
-const { CAR_STATUS } = require("../constants");
+const { CAR_STATUS, SERVICE_REQUEST_STATUS } = require("../constants");
 
 const {
   authenticateToken,
@@ -151,25 +151,133 @@ router.get(
         },
       });
 
-      let filteredRepairs = repairs;
+      const serviceRequests = await prisma.serviceRequest.findMany({
+        where: {
+          status: {
+            not: SERVICE_REQUEST_STATUS.CANCELLED
+          }
+        },
+        include: {
+          car: {
+            include: {
+              client: {
+                include: {
+                  user: {
+                    select: {
+                      id: true,
+                      name: true,
+                      lastName: true,
+                      email: true,
+                      phone: true,
+                      cuil: true,
+                      createdAt: true,
+                    },
+                  },
+                },
+              },
+              status: true,
+            },
+          },
+          assignedMechanic: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  lastName: true,
+                },
+              },
+            },
+          },
+          preferredMechanic: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  lastName: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+      });
+
+      const repairItems = repairs.map((repair) => ({
+        id: repair.id,
+        type: "repair",
+        statusId: repair.statusId,
+        description: repair.description,
+        cost: repair.cost,
+        warranty: repair.warranty,
+        createdAt: repair.createdAt,
+        updatedAt: repair.updatedAt,
+        car: repair.car,
+        mechanic: repair.mechanic,
+        licensePlate: repair.car?.licensePlate,
+        brand: repair.car?.brand,
+        model: repair.car?.model,
+        client: repair.car?.client,
+      }));
+
+      const requestItems = serviceRequests.map((request) => {
+
+        let statusId = request.car?.statusId || CAR_STATUS.ENTRADA;
+
+        if (request.status === SERVICE_REQUEST_STATUS.PENDING) {
+          statusId = CAR_STATUS.PENDIENTE;
+        } else if (request.status === SERVICE_REQUEST_STATUS.ASSIGNED || request.status === SERVICE_REQUEST_STATUS.PRESUPUESTO_ENVIADO) {
+          statusId = CAR_STATUS.EN_REVISION;
+        } else if (request.status === SERVICE_REQUEST_STATUS.IN_REPAIR) {
+          statusId = CAR_STATUS.EN_REPARACION;
+        } else if (request.status === SERVICE_REQUEST_STATUS.COMPLETED) {
+          statusId = CAR_STATUS.FINALIZADO;
+        } else if (request.status === SERVICE_REQUEST_STATUS.REJECTED) {
+          statusId = CAR_STATUS.RECHAZADO;
+        }
+
+        return {
+          id: request.id,
+          type: "request",
+          statusId: statusId,
+          description: request.description,
+          cost: null,
+          warranty: null,
+          createdAt: request.createdAt,
+          updatedAt: request.updatedAt,
+          car: request.car,
+          mechanic: request.assignedMechanic || request.preferredMechanic,
+          licensePlate: request.car?.licensePlate,
+          brand: request.car?.brand,
+          model: request.car?.model,
+          client: request.client,
+          requestStatus: request.status,
+        };
+      });
+
+      let allItems = [...repairItems, ...requestItems];
+
       if (search && search.trim()) {
         const searchTerm = search.trim().toLowerCase();
-        filteredRepairs = repairs.filter((repair) =>
-          repair.car?.licensePlate?.toLowerCase().includes(searchTerm) ||
-          repair.car?.brand?.toLowerCase().includes(searchTerm) ||
-          repair.car?.model?.toLowerCase().includes(searchTerm) ||
-          repair.car?.client?.user?.name?.toLowerCase().includes(searchTerm) ||
-          repair.car?.client?.user?.lastName?.toLowerCase().includes(searchTerm) ||
-          repair.mechanic?.user?.name?.toLowerCase().includes(searchTerm) ||
-          repair.mechanic?.user?.lastName?.toLowerCase().includes(searchTerm) ||
-          repair.description?.toLowerCase().includes(searchTerm)
+        allItems = allItems.filter((item) =>
+          item.car?.licensePlate?.toLowerCase().includes(searchTerm) ||
+          item.licensePlate?.toLowerCase().includes(searchTerm) ||
+          item.car?.brand?.toLowerCase().includes(searchTerm) ||
+          item.car?.model?.toLowerCase().includes(searchTerm) ||
+          item.car?.client?.user?.name?.toLowerCase().includes(searchTerm) ||
+          item.client?.user?.name?.toLowerCase().includes(searchTerm) ||
+          item.car?.client?.user?.lastName?.toLowerCase().includes(searchTerm) ||
+          item.client?.user?.lastName?.toLowerCase().includes(searchTerm) ||
+          item.mechanic?.user?.name?.toLowerCase().includes(searchTerm) ||
+          item.mechanic?.user?.lastName?.toLowerCase().includes(searchTerm) ||
+          item.description?.toLowerCase().includes(searchTerm)
         );
       }
 
-      const allItems = filteredRepairs.map((repair) => ({
-        ...repair,
-        type: "repair",
-      }));
+      allItems.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
       res.json({
         success: true,
@@ -591,8 +699,7 @@ router.post(
         message: "Reparación creada exitosamente",
         data: repair,
       });
-      // invalidate caches that depend on repairs listings
-      try { await invalidateNamespace('repairs'); } catch (_) {}
+      try { await invalidateNamespace('repairs'); } catch (_) { }
     } catch (error) {
       console.error("Error al crear reparación:", error);
       res.status(500).json({
@@ -718,7 +825,7 @@ router.put(
         message: "Reparación actualizada exitosamente",
         data: updatedRepair,
       });
-      try { await invalidateNamespace('repairs'); } catch (_) {}
+      try { await invalidateNamespace('repairs'); } catch (_) { }
     } catch (error) {
       console.error("Error al actualizar reparación:", error);
       res.status(500).json({
@@ -764,7 +871,7 @@ router.delete("/:id", requireRole("admin"), async (req, res) => {
       success: true,
       message: "Reparación eliminada exitosamente",
     });
-    try { await invalidateNamespace('repairs'); } catch (_) {}
+    try { await invalidateNamespace('repairs'); } catch (_) { }
   } catch (error) {
     console.error("Error al eliminar reparación:", error);
     res.status(500).json({

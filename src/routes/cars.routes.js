@@ -3,6 +3,7 @@ const { body, validationResult } = require("express-validator");
 const { PrismaClient } = require("@prisma/client");
 const licensePlateValidator = require("../utils/licensePlateValidator");
 const emailService = require("../services/emailService");
+const { CAR_STATUS } = require("../constants");
 
 const {
   authenticateToken,
@@ -483,6 +484,10 @@ router.put(
         }
       }
 
+      const terminalStatuses = [CAR_STATUS.ENTREGADO, CAR_STATUS.RECHAZADO, CAR_STATUS.CANCELADO];
+      const isTerminalStatus = updateData.statusId && terminalStatuses.includes(updateData.statusId);
+      const terminalStatusId = isTerminalStatus ? updateData.statusId : null;
+
       const updatedCar = await prisma.car.update({
         where: { id: parseInt(id) },
         data: updateData,
@@ -517,7 +522,6 @@ router.put(
         },
       });
 
-      // Enviar email de notificación si se cambió el estado
       if (updateData.statusId && updateData.statusId !== existingCar.statusId) {
         try {
           await emailService.sendCarStateChangeNotification(
@@ -529,9 +533,30 @@ router.put(
         }
       }
 
+      if (isTerminalStatus && terminalStatusId) {
+        const carIdForTimeout = parseInt(id);
+        const terminalStatusForLog = terminalStatusId;
+        console.log(`Programando cambio a ENTRADA para auto ${carIdForTimeout} en 15 segundos (estado actual: ${terminalStatusForLog})`);
+
+        setTimeout(async () => {
+          try {
+            console.log(`Ejecutando cambio a ENTRADA para auto ${carIdForTimeout}`);
+            const result = await prisma.car.update({
+              where: { id: carIdForTimeout },
+              data: { statusId: CAR_STATUS.ENTRADA },
+            });
+            console.log(`Auto ${carIdForTimeout} vuelto automáticamente a ENTRADA después de estar en estado terminal (${terminalStatusForLog}). Estado actual: ${result.statusId}`);
+          } catch (error) {
+            console.error(`Error al volver auto ${carIdForTimeout} a ENTRADA:`, error);
+          }
+        }, 15000);
+      }
+
       res.json({
         success: true,
-        message: "Auto actualizado exitosamente",
+        message: isTerminalStatus
+          ? "Auto actualizado exitosamente. Volverá a entrada en 15 segundos"
+          : "Auto actualizado exitosamente",
         data: updatedCar,
       });
     } catch (error) {
