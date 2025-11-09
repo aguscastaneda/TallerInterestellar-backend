@@ -161,6 +161,7 @@ router.post(
 
       try {
         await invalidateNamespace('cars');
+        await invalidateNamespace('requests');
       } catch (cacheError) {
         console.error("Error invalidating cache:", cacheError);
       }
@@ -361,6 +362,7 @@ router.put(
 
       try {
         await invalidateNamespace('cars');
+        await invalidateNamespace('requests');
       } catch (cacheError) {
         console.error("Error invalidating cache:", cacheError);
       }
@@ -454,9 +456,16 @@ router.put(
 
         try {
           await invalidateNamespace('cars');
+          await invalidateNamespace('requests');
         } catch (cacheError) {
           console.error("Error invalidating cache:", cacheError);
         }
+      }
+
+      try {
+        await invalidateNamespace('requests');
+      } catch (cacheError) {
+        console.error("Error invalidating cache:", cacheError);
       }
 
       let repair = null;
@@ -499,6 +508,7 @@ router.put(
 
         try {
           await invalidateNamespace('cars');
+          await invalidateNamespace('requests');
         } catch (cacheError) {
           console.error("Error invalidating cache:", cacheError);
         }
@@ -631,6 +641,7 @@ router.post(
 
       try {
         await invalidateNamespace('cars');
+        await invalidateNamespace('requests');
       } catch (cacheError) {
         console.error("Error invalidating cache:", cacheError);
       }
@@ -733,6 +744,7 @@ router.post("/:id/cancel", async (req, res) => {
 
     try {
       await invalidateNamespace('cars');
+      await invalidateNamespace('requests');
     } catch (cacheError) {
       console.error("Error invalidating cache:", cacheError);
     }
