@@ -8,7 +8,7 @@ const {
   authenticateToken,
   requireRole,
 } = require("../middlewares/authMiddleware");
-const { cacheGet } = require("../middlewares/cacheMiddleware");
+const { cacheGet, invalidateNamespace } = require("../middlewares/cacheMiddleware");
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -75,7 +75,7 @@ router.post(
         where: {
           carId: carId,
           status: {
-            in: [SERVICE_REQUEST_STATUS.PENDING, SERVICE_REQUEST_STATUS.ASSIGNED, SERVICE_REQUEST_STATUS.IN_PROGRESS],
+            in: [SERVICE_REQUEST_STATUS.PENDING, SERVICE_REQUEST_STATUS.ASSIGNED, SERVICE_REQUEST_STATUS.IN_REPAIR],
           },
         },
       });
@@ -157,6 +157,12 @@ router.post(
         await emailService.sendCarStateChangeNotification(updatedCar);
       } catch (emailError) {
         console.error("Error sending car state change email:", emailError);
+      }
+
+      try {
+        await invalidateNamespace('cars');
+      } catch (cacheError) {
+        console.error("Error invalidating cache:", cacheError);
       }
 
       return res
@@ -352,6 +358,13 @@ router.put(
       } catch (emailError) {
         console.error("Error sending mechanic assignment email:", emailError);
       }
+
+      try {
+        await invalidateNamespace('cars');
+      } catch (cacheError) {
+        console.error("Error invalidating cache:", cacheError);
+      }
+
       res.json({ success: true, message: "Solicitud asignada", data: updated });
     } catch (error) {
       console.error("Error al asignar solicitud:", error);
@@ -366,7 +379,7 @@ router.put(
   "/:id/status",
   [
     body("status").isIn([
-      SERVICE_REQUEST_STATUS.IN_PROGRESS,
+      SERVICE_REQUEST_STATUS.IN_REPAIR,
       SERVICE_REQUEST_STATUS.COMPLETED,
     ]),
     body("description").optional().trim(),
@@ -417,7 +430,7 @@ router.put(
         data: { status },
       });
 
-      if (status === SERVICE_REQUEST_STATUS.IN_PROGRESS) {
+      if (status === SERVICE_REQUEST_STATUS.IN_REPAIR) {
         const updatedCarInProgress = await prisma.car.update({
           where: { id: reqDb.carId },
           data: { statusId: CAR_STATUS.EN_REPARACION },
@@ -437,6 +450,12 @@ router.put(
           );
         } catch (emailError) {
           console.error("Error sending repair in progress email:", emailError);
+        }
+
+        try {
+          await invalidateNamespace('cars');
+        } catch (cacheError) {
+          console.error("Error invalidating cache:", cacheError);
         }
       }
 
@@ -476,6 +495,12 @@ router.put(
           await emailService.sendCarStateChangeNotification(finalizedCar);
         } catch (emailError) {
           console.error("Error sending repair completed email:", emailError);
+        }
+
+        try {
+          await invalidateNamespace('cars');
+        } catch (cacheError) {
+          console.error("Error invalidating cache:", cacheError);
         }
       }
 
@@ -604,6 +629,12 @@ router.post(
         console.error("Error sending budget email:", emailError);
       }
 
+      try {
+        await invalidateNamespace('cars');
+      } catch (cacheError) {
+        console.error("Error invalidating cache:", cacheError);
+      }
+
       res.json({
         success: true,
         message: "Presupuesto enviado al cliente",
@@ -698,6 +729,12 @@ router.post("/:id/cancel", async (req, res) => {
       await emailService.sendCarStateChangeNotification(updatedCar);
     } catch (emailError) {
       console.error("Error sending cancellation email:", emailError);
+    }
+
+    try {
+      await invalidateNamespace('cars');
+    } catch (cacheError) {
+      console.error("Error invalidating cache:", cacheError);
     }
 
     const carIdForTimeout = request.carId;
