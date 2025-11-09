@@ -51,7 +51,7 @@ router.post(
         ?.toLowerCase()
         .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "");
-      
+
       if (userRole === "jefe" && roleId !== 2) {
         return res.status(403).json({
           success: false,
@@ -273,7 +273,7 @@ router.get("/:id", authenticateToken, async (req, res) => {
       ?.toLowerCase()
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "");
-    
+
     if (userRole !== "admin" && req.user.id !== parseInt(id)) {
       return res.status(403).json({
         success: false,
@@ -338,16 +338,16 @@ router.put("/:id", authenticateToken, async (req, res) => {
 
     const targetUserId = parseInt(id);
     const isSelf = req.user.id === targetUserId;
-    
+
 
     const isAdmin = req.user.roleId === 4;
-    
+
     const userRoleName = req.user.role?.name
       ?.toLowerCase()
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "");
     const isAdminByName = userRoleName === "admin";
-    
+
     const finalIsAdmin = isAdmin || isAdminByName;
 
     console.log("=== VERIFICACIÓN DE PERMISOS ===");
@@ -450,7 +450,7 @@ router.put("/:id", authenticateToken, async (req, res) => {
           "Acceso denegado. No puedes actualizar el perfil de otros usuarios.",
       });
     }
-    
+
     console.log("=== ACCESO PERMITIDO ===");
 
     const existingUser = await prisma.user.findUnique({
@@ -464,9 +464,19 @@ router.put("/:id", authenticateToken, async (req, res) => {
       });
     }
 
-    if (updateData.email && updateData.email !== existingUser.email) {
+    const allowedFields = ['name', 'lastName', 'email', 'cuil', 'phone', 'password'];
+    const cleanUpdateData = {};
+
+    for (const field of allowedFields) {
+      if (updateData[field] !== undefined) {
+        cleanUpdateData[field] = updateData[field];
+      }
+    }
+
+
+    if (cleanUpdateData.email && cleanUpdateData.email !== existingUser.email) {
       const emailExists = await prisma.user.findUnique({
-        where: { email: updateData.email },
+        where: { email: cleanUpdateData.email },
       });
 
       if (emailExists) {
@@ -477,13 +487,29 @@ router.put("/:id", authenticateToken, async (req, res) => {
       }
     }
 
-    if (updateData.password) {
-      updateData.password = await bcrypt.hash(updateData.password, 10);
+    if (cleanUpdateData.cuil && cleanUpdateData.cuil !== existingUser.cuil) {
+      const cuilExists = await prisma.user.findFirst({
+        where: {
+          cuil: cleanUpdateData.cuil,
+          id: { not: parseInt(id) }
+        },
+      });
+
+      if (cuilExists) {
+        return res.status(400).json({
+          success: false,
+          message: "El CUIL ya está en uso por otro usuario",
+        });
+      }
+    }
+
+    if (cleanUpdateData.password) {
+      cleanUpdateData.password = await bcrypt.hash(cleanUpdateData.password, 12);
     }
 
     const updatedUser = await prisma.user.update({
       where: { id: parseInt(id) },
-      data: updateData,
+      data: cleanUpdateData,
       select: {
         id: true,
         name: true,
@@ -526,7 +552,7 @@ router.put("/:id/change-password", authenticateToken, async (req, res) => {
       ?.toLowerCase()
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "");
-    
+
     if (userRole !== "admin" && req.user.id !== parseInt(id)) {
       return res.status(403).json({
         success: false,
@@ -593,16 +619,16 @@ router.delete(
       console.log("Usuario autenticado:", JSON.stringify(req.user, null, 2));
 
       const isSelf = req.user.id === targetUserId;
-      
+
 
       const isAdmin = req.user.roleId === 4;
-      
+
       const userRoleName = req.user.role?.name
         ?.toLowerCase()
         .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "");
       const isAdminByName = userRoleName === "admin";
-      
+
       const finalIsAdmin = isAdmin || isAdminByName;
 
 
@@ -698,7 +724,7 @@ router.delete(
             "Acceso denegado. No puedes eliminar el perfil de otros usuarios.",
         });
       }
-      
+
       console.log("=== ACCESO PERMITIDO (DELETE) ===");
 
       const existingUser = await prisma.user.findUnique({
@@ -720,9 +746,8 @@ router.delete(
 
       res.json({
         success: true,
-        message: `Usuario ${
-          newActiveState ? "activado" : "desactivado"
-        } correctamente`,
+        message: `Usuario ${newActiveState ? "activado" : "desactivado"
+          } correctamente`,
       });
     } catch (error) {
       console.error("Error al desactivar usuario:", error);
@@ -882,7 +907,7 @@ router.put(
         ?.toLowerCase()
         .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "");
-      
+
       if (userRole === "jefe" && req.user.boss?.id !== parseInt(bossId)) {
         return res.status(403).json({
           success: false,
