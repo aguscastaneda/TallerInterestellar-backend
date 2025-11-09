@@ -47,14 +47,19 @@ router.post(
       const { name, lastName, email, password, cuil, phone, roleId, bossId } =
         req.body;
 
-      if (req.user.role === "jefe" && roleId !== 2) {
+      const userRole = req.user.role?.name
+        ?.toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
+      
+      if (userRole === "jefe" && roleId !== 2) {
         return res.status(403).json({
           success: false,
           message: "Los jefes de mecánicos solo pueden crear mecánicos.",
         });
       }
 
-      if (req.user.role === "jefe") {
+      if (userRole === "jefe") {
         console.log("Boss ID del usuario autenticado:", req.user.boss?.id);
         console.log("Boss ID enviado en la solicitud:", bossId);
         if (bossId !== req.user.boss?.id) {
@@ -264,7 +269,12 @@ router.get("/:id", authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
 
-    if (req.user.role !== "admin" && req.user.id !== parseInt(id)) {
+    const userRole = req.user.role?.name
+      ?.toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+    
+    if (userRole !== "admin" && req.user.id !== parseInt(id)) {
       return res.status(403).json({
         success: false,
         message: "Acceso denegado. No puedes ver el perfil de otros usuarios.",
@@ -328,9 +338,28 @@ router.put("/:id", authenticateToken, async (req, res) => {
 
     const targetUserId = parseInt(id);
     const isSelf = req.user.id === targetUserId;
-    const isAdmin = req.user.roleId === 1;
+    
 
-    console.log("Verificando permisos - isSelf:", isSelf, "isAdmin:", isAdmin);
+    const isAdmin = req.user.roleId === 4;
+    
+    const userRoleName = req.user.role?.name
+      ?.toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+    const isAdminByName = userRoleName === "admin";
+    
+    const finalIsAdmin = isAdmin || isAdminByName;
+
+    console.log("=== VERIFICACIÓN DE PERMISOS ===");
+    console.log("Usuario autenticado ID:", req.user.id);
+    console.log("Usuario objetivo ID:", targetUserId);
+    console.log("Role ID:", req.user.roleId);
+    console.log("Role Name:", req.user.role?.name);
+    console.log("Role Name Normalizado:", userRoleName);
+    console.log("isSelf:", isSelf);
+    console.log("isAdmin (por roleId):", isAdmin);
+    console.log("isAdminByName:", isAdminByName);
+    console.log("finalIsAdmin:", finalIsAdmin);
 
     let isBossOfMechanic = false;
     if (req.user.roleId === 3 && req.user.boss) {
@@ -410,21 +439,19 @@ router.put("/:id", authenticateToken, async (req, res) => {
       isBossOfMechanic
     );
 
-    if (!isAdmin && !isSelf && !isBossOfMechanic) {
-      console.log(
-        "Acceso denegado - isAdmin:",
-        isAdmin,
-        "isSelf:",
-        isSelf,
-        "isBossOfMechanic:",
-        isBossOfMechanic
-      );
+    if (!finalIsAdmin && !isSelf && !isBossOfMechanic) {
+      console.log("=== ACCESO DENEGADO ===");
+      console.log("finalIsAdmin:", finalIsAdmin);
+      console.log("isSelf:", isSelf);
+      console.log("isBossOfMechanic:", isBossOfMechanic);
       return res.status(403).json({
         success: false,
         message:
           "Acceso denegado. No puedes actualizar el perfil de otros usuarios.",
       });
     }
+    
+    console.log("=== ACCESO PERMITIDO ===");
 
     const existingUser = await prisma.user.findUnique({
       where: { id: parseInt(id) },
@@ -495,7 +522,12 @@ router.put("/:id/change-password", authenticateToken, async (req, res) => {
     const { id } = req.params;
     const { currentPassword, newPassword } = req.body;
 
-    if (req.user.role !== "admin" && req.user.id !== parseInt(id)) {
+    const userRole = req.user.role?.name
+      ?.toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+    
+    if (userRole !== "admin" && req.user.id !== parseInt(id)) {
       return res.status(403).json({
         success: false,
         message:
@@ -561,14 +593,18 @@ router.delete(
       console.log("Usuario autenticado:", JSON.stringify(req.user, null, 2));
 
       const isSelf = req.user.id === targetUserId;
-      const isAdmin = req.user.roleId === 1;
+      
 
-      console.log(
-        "Verificando permisos - isSelf:",
-        isSelf,
-        "isAdmin:",
-        isAdmin
-      );
+      const isAdmin = req.user.roleId === 4;
+      
+      const userRoleName = req.user.role?.name
+        ?.toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
+      const isAdminByName = userRoleName === "admin";
+      
+      const finalIsAdmin = isAdmin || isAdminByName;
+
 
       let isBossOfMechanic = false;
       if (req.user.roleId === 3 && req.user.boss) {
@@ -651,21 +687,19 @@ router.delete(
         isBossOfMechanic
       );
 
-      if (!isAdmin && !isSelf && !isBossOfMechanic) {
-        console.log(
-          "Acceso denegado para eliminación - isAdmin:",
-          isAdmin,
-          "isSelf:",
-          isSelf,
-          "isBossOfMechanic:",
-          isBossOfMechanic
-        );
+      if (!finalIsAdmin && !isSelf && !isBossOfMechanic) {
+        console.log("=== ACCESO DENEGADO (DELETE) ===");
+        console.log("finalIsAdmin:", finalIsAdmin);
+        console.log("isSelf:", isSelf);
+        console.log("isBossOfMechanic:", isBossOfMechanic);
         return res.status(403).json({
           success: false,
           message:
             "Acceso denegado. No puedes eliminar el perfil de otros usuarios.",
         });
       }
+      
+      console.log("=== ACCESO PERMITIDO (DELETE) ===");
 
       const existingUser = await prisma.user.findUnique({
         where: { id: parseInt(id) },
@@ -844,7 +878,12 @@ router.put(
       const { mechanicId } = req.params;
       const { bossId } = req.body;
 
-      if (req.user.role === "jefe" && req.user.boss?.id !== parseInt(bossId)) {
+      const userRole = req.user.role?.name
+        ?.toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
+      
+      if (userRole === "jefe" && req.user.boss?.id !== parseInt(bossId)) {
         return res.status(403).json({
           success: false,
           message:

@@ -71,6 +71,22 @@ router.post(
           .json({ success: false, message: "Auto inválido para el cliente" });
       }
 
+      const existingRequest = await prisma.serviceRequest.findFirst({
+        where: {
+          carId: carId,
+          status: {
+            in: [SERVICE_REQUEST_STATUS.PENDING, SERVICE_REQUEST_STATUS.ASSIGNED, SERVICE_REQUEST_STATUS.IN_PROGRESS],
+          },
+        },
+      });
+
+      if (existingRequest) {
+        return res.status(400).json({
+          success: false,
+          message: "Ya existe una solicitud activa para este vehículo. Por favor, espera a que se complete o cancele la solicitud existente.",
+        });
+      }
+
       let assignedBossId = null;
       if (preferredMechanicId) {
         const mech = await prisma.mechanic.findUnique({
